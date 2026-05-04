@@ -1,10 +1,19 @@
 {
-"dashboard": {
-"last_sync": "",
-"notes": "Configuraciones globales del panel"
-},
-"historial": [],
-"gastos": [],
-"clientes": [],
-"turnos": []
+  "dashboard": {
+    "last_sync": "",
+    "notes": "Configuraciones globales del panel"
+  },
+  "historial": [],
+  "gastos": [],
+  "clientes": [
+    {
+      "id": 1777856612734,
+      "name": "asdasd",
+      "phone": "12321321312",
+      "notes": "asdasd",
+      "lastVisit": "Sin visitas aún",
+      "totalVisits": 0
+    }
+  ],
+  "turnos": []
 }
