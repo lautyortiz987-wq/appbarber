@@ -1,6 +1,14 @@
 {
   "historial": [
     {
+      "id": 1777869196980,
+      "client": "Ari",
+      "service": "Degradé / Fade",
+      "price": 20000,
+      "date": "2026-05-04T04:33:16.980Z",
+      "isFromTurno": true
+    },
+    {
       "id": 1777868296569,
       "client": "222",
       "service": "Corte Clásico",
@@ -18,7 +26,15 @@
     }
   ],
   "gastos": [],
-  "clientes": [],
+  "clientes": [
+    {
+      "id": 1777869196982,
+      "name": "Ari",
+      "phone": "342 434-0593",
+      "visits": 1,
+      "lastVisit": "2026-05-04T04:33:16.981Z"
+    }
+  ],
   "turnos": [
     {
       "id": "1777869159085",
@@ -28,7 +44,7 @@
       "service": "Degradé / Fade",
       "price": 20000,
       "date": "2026-05-04",
-      "status": "pending"
+      "status": "completed"
     }
   ]
 }
