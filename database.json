@@ -1,7 +1,24 @@
 {
-  "historial": [],
+  "historial": [
+    {
+      "id": 1777883310390,
+      "client": "Diego martinez",
+      "service": "Degradé / Fade",
+      "price": 6000,
+      "date": "2026-05-04T08:28:30.390Z",
+      "isFromTurno": true
+    }
+  ],
   "gastos": [],
-  "clientes": [],
+  "clientes": [
+    {
+      "id": 1777883310392,
+      "name": "Diego martinez",
+      "phone": "",
+      "visits": 1,
+      "lastVisit": "2026-05-04T08:28:30.391Z"
+    }
+  ],
   "turnos": [
     {
       "id": "1777883307540",
@@ -11,7 +28,7 @@
       "service": "Degradé / Fade",
       "price": 6000,
       "date": "2026-05-01",
-      "status": "pending"
+      "status": "completed"
     }
   ]
 }
