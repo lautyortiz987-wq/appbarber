@@ -25,7 +25,15 @@
       "isFromTurno": true
     }
   ],
-  "gastos": [],
+  "gastos": [
+    {
+      "id": 1777883405948,
+      "detail": "After, 5 en 1, papel de cuello",
+      "amount": 17000,
+      "category": "Insumos",
+      "date": "2026-05-04T08:30:05.948Z"
+    }
+  ],
   "clientes": [
     {
       "id": 1777883310392,
