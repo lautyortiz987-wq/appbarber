@@ -1,14 +1,6 @@
 {
   "historial": [],
-  "gastos": [
-    {
-      "id": 1777882665325,
-      "detail": "alquiler",
-      "amount": 5000,
-      "category": "Insumos",
-      "date": "2026-05-04T08:17:45.325Z"
-    }
-  ],
+  "gastos": [],
   "clientes": [],
   "turnos": []
 }
