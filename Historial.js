@@ -1,9 +1,11 @@
 /**
  * HistorialModule - Panel de Estadísticas Avanzadas
- * Este módulo transforma el historial en un centro de análisis visual.
+ * Con soporte para eliminar ventas del historial.
  */
-window.HistorialModule = ({ services, expenses }) => {
+window.HistorialModule = ({ services, expenses, onDeleteService }) => {
     const Icon = window.LucideIcon;
+    const [confirmId, setConfirmId] = React.useState(null);
+    const [showAll, setShowAll] = React.useState(false);
 
     // Cálculos de métricas
     const totalRevenue = services.reduce((acc, s) => acc + Number(s.price), 0);
@@ -21,6 +23,16 @@ window.HistorialModule = ({ services, expenses }) => {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 3);
 
+    const allMovements = [...services, ...expenses]
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const visibleMovements = showAll ? allMovements : allMovements.slice(0, 8);
+
+    const handleDelete = (id) => {
+        if (onDeleteService) onDeleteService(id);
+        setConfirmId(null);
+    };
+
     return (
         <div className="space-y-8 fade-in">
             {/* Fila de Tarjetas Métricas */}
@@ -30,14 +42,14 @@ window.HistorialModule = ({ services, expenses }) => {
                     value={`$${totalRevenue.toLocaleString()}`} 
                     icon="trending-up" 
                     color="text-emerald-400"
-                    trend="+12% este mes"
+                    trend={`${services.length} ventas`}
                 />
                 <StatCard 
                     title="Gastos Totales" 
                     value={`$${totalExpenses.toLocaleString()}`} 
                     icon="trending-down" 
                     color="text-rose-400"
-                    trend="Estable"
+                    trend="Insumos y fijos"
                 />
                 <StatCard 
                     title="Ganancia Neta" 
@@ -48,7 +60,7 @@ window.HistorialModule = ({ services, expenses }) => {
                 />
                 <StatCard 
                     title="Ticket Promedio" 
-                    value={`$${avgTicket}`} 
+                    value={`$${Number(avgTicket).toLocaleString()}`} 
                     icon="shopping-bag" 
                     color="text-amber-400"
                     trend="Por cliente"
@@ -56,7 +68,7 @@ window.HistorialModule = ({ services, expenses }) => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Columna: Servicios más pedidos */}
+                {/* Top Servicios */}
                 <div className="lg:col-span-1 glass-card p-8 border-white/5">
                     <h3 className="text-sm font-black uppercase text-slate-500 tracking-[0.2em] mb-6 flex items-center gap-2">
                         <Icon name="award" size={16} className="text-blue-500" />
@@ -85,34 +97,30 @@ window.HistorialModule = ({ services, expenses }) => {
                     </div>
                 </div>
 
-                {/* Columna: Rendimiento Financiero Visual */}
+                {/* Gráfico Comparativo */}
                 <div className="lg:col-span-2 glass-card p-8 border-white/5 relative overflow-hidden">
                     <h3 className="text-sm font-black uppercase text-slate-500 tracking-[0.2em] mb-6">Comparativa Ingresos vs Gastos</h3>
-                    
                     <div className="flex items-end gap-4 h-48 mt-10">
-                        {/* Simulación de gráfico de barras */}
                         <div className="flex-1 flex flex-col items-center gap-3 group">
                             <div className="w-full bg-emerald-500/10 border border-emerald-500/20 rounded-t-xl transition-all group-hover:bg-emerald-500/20 relative" style={{ height: '80%' }}>
-                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    ${totalRevenue}
+                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                    ${totalRevenue.toLocaleString()}
                                 </span>
                             </div>
                             <span className="text-[10px] font-black text-slate-500 uppercase">Ingresos</span>
                         </div>
-                        
                         <div className="flex-1 flex flex-col items-center gap-3 group">
                             <div className="w-full bg-rose-500/10 border border-rose-500/20 rounded-t-xl transition-all group-hover:bg-rose-500/20 relative" style={{ height: `${(totalExpenses / (totalRevenue || 1)) * 80}%`, minHeight: '10%' }}>
-                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    ${totalExpenses}
+                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                    ${totalExpenses.toLocaleString()}
                                 </span>
                             </div>
                             <span className="text-[10px] font-black text-slate-500 uppercase">Gastos</span>
                         </div>
-
                         <div className="flex-1 flex flex-col items-center gap-3 group">
                             <div className="w-full bg-blue-500/10 border border-blue-500/20 rounded-t-xl transition-all group-hover:bg-blue-500/20 relative" style={{ height: `${(netProfit / (totalRevenue || 1)) * 80}%`, minHeight: '5%' }}>
-                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    ${netProfit}
+                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                    ${netProfit.toLocaleString()}
                                 </span>
                             </div>
                             <span className="text-[10px] font-black text-slate-500 uppercase">Ganancia</span>
@@ -121,9 +129,17 @@ window.HistorialModule = ({ services, expenses }) => {
                 </div>
             </div>
 
-            {/* Listado de Actividad Reciente Simplificado */}
+            {/* Tabla de Movimientos con opción de eliminar ventas */}
             <div className="glass-card p-8 border-white/5">
-                <h3 className="text-sm font-black uppercase text-slate-500 tracking-[0.2em] mb-6">Últimos Movimientos</h3>
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-sm font-black uppercase text-slate-500 tracking-[0.2em]">
+                        Historial de Movimientos
+                    </h3>
+                    <span className="text-[10px] font-black text-slate-600 uppercase bg-white/5 px-3 py-1 rounded-lg">
+                        {allMovements.length} registros
+                    </span>
+                </div>
+
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>
@@ -132,37 +148,87 @@ window.HistorialModule = ({ services, expenses }) => {
                                 <th className="pb-4">Concepto</th>
                                 <th className="pb-4">Categoría</th>
                                 <th className="pb-4 text-right">Monto</th>
+                                <th className="pb-4 text-right">Acción</th>
                             </tr>
                         </thead>
                         <tbody className="text-xs font-bold">
-                            {[...services, ...expenses]
-                                .sort((a, b) => new Date(b.date) - new Date(a.date))
-                                .slice(0, 5)
-                                .map((item, i) => (
-                                    <tr key={i} className="border-b border-white/5 last:border-0">
-                                        <td className="py-4 text-slate-500">{new Date(item.date).toLocaleDateString()}</td>
-                                        <td className="py-4 text-slate-200">{item.client || item.detail}</td>
+                            {visibleMovements.length > 0 ? visibleMovements.map((item, i) => {
+                                const isService = !!item.price;
+                                const isConfirming = confirmId === item.id;
+
+                                return (
+                                    <tr key={item.id || i} className="border-b border-white/5 last:border-0 group hover:bg-white/[0.02] transition-all">
+                                        <td className="py-4 text-slate-500">
+                                            {new Date(item.date).toLocaleDateString('es-AR')}
+                                        </td>
+                                        <td className="py-4 text-slate-200 font-bold">
+                                            {item.client || item.detail}
+                                        </td>
                                         <td className="py-4">
-                                            <span className={`px-2 py-1 rounded text-[9px] uppercase ${item.price ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                                            <span className={`px-2 py-1 rounded text-[9px] uppercase ${isService ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
                                                 {item.service || item.category}
                                             </span>
                                         </td>
-                                        <td className={`py-4 text-right font-black ${item.price ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                            {item.price ? `+$${item.price}` : `-$${item.amount}`}
+                                        <td className={`py-4 text-right font-black ${isService ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                            {isService ? `+$${Number(item.price).toLocaleString()}` : `-$${Number(item.amount).toLocaleString()}`}
+                                        </td>
+                                        <td className="py-4 text-right">
+                                            {isService && (
+                                                isConfirming ? (
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <span className="text-[9px] text-slate-400 uppercase font-black">¿Seguro?</span>
+                                                        <button
+                                                            onClick={() => handleDelete(item.id)}
+                                                            className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white text-[9px] font-black uppercase rounded-lg transition-all"
+                                                        >
+                                                            Sí
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setConfirmId(null)}
+                                                            className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white text-[9px] font-black uppercase rounded-lg transition-all"
+                                                        >
+                                                            No
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => setConfirmId(item.id)}
+                                                        className="opacity-0 group-hover:opacity-100 p-2 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
+                                                        title="Eliminar venta"
+                                                    >
+                                                        <Icon name="trash-2" size={15} />
+                                                    </button>
+                                                )
+                                            )}
                                         </td>
                                     </tr>
-                            ))}
+                                );
+                            }) : (
+                                <tr>
+                                    <td colSpan="5" className="py-12 text-center text-slate-600 text-xs font-black uppercase italic">
+                                        Sin movimientos registrados
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
+
+                {allMovements.length > 8 && (
+                    <div className="mt-6 text-center">
+                        <button
+                            onClick={() => setShowAll(!showAll)}
+                            className="text-[10px] font-black text-blue-500 uppercase tracking-widest hover:text-blue-400 transition-colors px-4 py-2 bg-blue-500/10 rounded-xl border border-blue-500/20"
+                        >
+                            {showAll ? 'Ver menos' : `Ver todos (${allMovements.length})`}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
 };
 
-/**
- * Componente interno para las tarjetas de estadísticas
- */
 const StatCard = ({ title, value, icon, color, trend }) => {
     const Icon = window.LucideIcon;
     return (
