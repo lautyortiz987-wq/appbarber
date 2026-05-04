@@ -1,14 +1,6 @@
 {
   "historial": [
     {
-      "id": 1777868277598,
-      "client": "222",
-      "service": "Corte Clásico",
-      "price": 2222222222,
-      "date": "2026-05-04T04:17:57.598Z",
-      "isFromTurno": true
-    },
-    {
       "id": 1777868269323,
       "client": "2222",
       "service": "Corte Clásico",
@@ -33,13 +25,6 @@
       "phone": "22222",
       "visits": 1,
       "lastVisit": "2026-05-04T04:17:49.323Z"
-    },
-    {
-      "id": 1777868277599,
-      "name": "222",
-      "phone": "222",
-      "visits": 1,
-      "lastVisit": "2026-05-04T04:17:57.598Z"
     }
   ],
   "turnos": [
@@ -51,7 +36,7 @@
       "service": "Corte Clásico",
       "price": 2222222222,
       "date": "2026-05-04",
-      "status": "completed"
+      "status": "pending"
     },
     {
       "id": "1777868268419",
