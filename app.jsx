@@ -28,11 +28,12 @@ const App = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     
-    // Estado Centralizado
+    // Estado Centralizado - Mapeado a las claves de tu database.json
     const [data, setData] = useState({
-        services: [],
-        expenses: [],
-        clients: []
+        historial: [],
+        gastos: [],
+        clientes: [],
+        turnos: []
     });
 
     const Icon = window.LucideIcon;
@@ -126,9 +127,9 @@ const App = () => {
         }
 
         const props = {
-            services: data.services,
-            expenses: data.expenses,
-            clients: data.clients
+            services: data.historial || [],
+            expenses: data.gastos || [],
+            clients: data.clientes || []
         };
 
         switch(activeTab) {
@@ -139,23 +140,27 @@ const App = () => {
             case 'gasto':
                 return window.GastosModule ? 
                     <window.GastosModule 
-                        expenses={data.expenses} 
-                        onAdd={(e) => updateData('expenses', [e, ...data.expenses])}
-                        onDelete={(id) => updateData('expenses', data.expenses.filter(x => x.id !== id))}
+                        expenses={data.gastos} 
+                        onAdd={(e) => updateData('gastos', [e, ...data.gastos])}
+                        onDelete={(id) => updateData('gastos', data.gastos.filter(x => x.id !== id))}
                     /> : <div className="text-center py-20 italic text-slate-500">Cargando Gastos...</div>;
             case 'clientes':
                 return window.ClientesModule ? 
                     <window.ClientesModule 
-                        clients={data.clients} 
-                        setClients={(c) => updateData('clients', c)} 
+                        clients={data.clientes} 
+                        setClients={(c) => updateData('clientes', c)} 
                     /> : <div className="text-center py-20 italic text-slate-500">Cargando Clientes...</div>;
             case 'turnos':
-                return window.TurnosModule ? <window.TurnosModule /> : <div className="text-center py-20 italic text-slate-500">Cargando Agenda...</div>;
+                return window.TurnosModule ? 
+                    <window.TurnosModule 
+                        appointments={data.turnos || []}
+                        setAppointments={(a) => updateData('turnos', a)}
+                    /> : <div className="text-center py-20 italic text-slate-500">Cargando Agenda...</div>;
             default: return null;
         }
     };
 
-    const balanceTotal = (data.services.reduce((a, b) => a + Number(b.price || 0), 0) - data.expenses.reduce((a, b) => a + Number(b.amount || 0), 0));
+    const balanceTotal = ((data.historial || []).reduce((a, b) => a + Number(b.price || 0), 0) - (data.gastos || []).reduce((a, b) => a + Number(b.amount || 0), 0));
 
     return (
         <div className="flex min-h-screen relative bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30">
