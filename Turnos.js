@@ -59,7 +59,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
         setIsSubmitting(true);
         try {
             const newAppointment = {
-                id: Date.now(),
+                id: Date.now().toString(), // ID único como string
                 client: form.client.trim(),
                 phone: form.phone.trim(),
                 time: form.time,
@@ -69,6 +69,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                 status: 'pending'
             };
 
+            // IMPORTANTE: Llamamos a onAdd que es la que guarda en la base de datos real del Canvas
             if (onAdd) {
                 await onAdd(newAppointment);
             }
@@ -97,6 +98,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
     const sendWhatsApp = (app) => {
         const message = `Hola ${app.client}! Te recordamos tu turno en la barbería para el día ${app.date} a las ${app.time}hs. ¡Te esperamos!`;
         const phone = app.phone.replace(/\D/g, '');
+        if (!phone) return;
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
     };
 
@@ -141,7 +143,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                 <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">WhatsApp (Opcional)</label>
                                 <input 
                                     className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white"
-                                    placeholder="Sin 0 ni 15"
+                                    placeholder="Ej: 54911..."
                                     value={form.phone}
                                     onChange={e => setForm({...form, phone: e.target.value})}
                                 />
