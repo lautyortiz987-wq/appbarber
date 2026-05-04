@@ -1,14 +1,6 @@
 {
   "historial": [],
-  "gastos": [
-    {
-      "id": 1777882835592,
-      "detail": "navaja",
-      "amount": 20000,
-      "category": "Insumos",
-      "date": "2026-05-04T08:20:35.592Z"
-    }
-  ],
+  "gastos": [],
   "clientes": [],
   "turnos": []
 }
