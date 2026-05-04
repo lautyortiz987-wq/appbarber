@@ -3,64 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barber Pro Manager | Modular Dashboard</title>
+    <title>Barber Pro Manager | GitHub</title>
     
-    <!-- Frameworks & Fonts -->
+    <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
 
     <style>
-        :root {
-            --bg-dark: #020617;
-            --card-bg: rgba(30, 41, 59, 0.4);
-        }
+        :root { --bg-dark: #020617; --card-bg: rgba(30, 41, 59, 0.4); }
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
             background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
-            margin: 0;
-            color: #f8fafc;
-            min-height: 100vh;
+            margin: 0; color: #f8fafc; min-height: 100vh;
         }
-        .glass-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 1.5rem;
-        }
-        .sidebar-link.active {
-            background: rgba(59, 130, 246, 0.15);
-            color: #60a5fa;
-        }
-        .sidebar-link.active::before {
-            content: ''; position: absolute; left: 0; top: 20%; height: 60%; width: 4px;
-            background: #3b82f6; border-radius: 0 4px 4px 0; box-shadow: 0 0 15px #3b82f6;
-        }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        input, select {
-            background: rgba(15, 23, 42, 0.8) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            color: white !important;
-        }
+        .glass-card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 1.5rem; }
+        .sidebar-link.active { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-    <!-- Módulos de la Aplicación -->
+    <!-- 1. DEFINIR LOS ICONOS PRIMERO -->
+    <script>
+        window.LucideIcon = ({ name, size = 24, className = "" }) => {
+            const IconName = name.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('');
+            const IconComponent = lucide.icons[IconName] || lucide.icons.HelpCircle;
+            return React.createElement(IconComponent, { size, className });
+        };
+    </script>
+
+    <!-- 2. CARGAR TUS ARCHIVOS JSX (Asegúrate de que los nombres coincidan) -->
+    <!-- El atributo data-type="module" y type="text/babel" es clave aquí -->
     <script type="text/babel" src="Dashboard.jsx"></script>
-    <script type="text/babel" src="Historial.jsx"></script>
-    <script type="text/babel" src="Gastos.jsx"></script>
-    <script type="text/babel" src="Clientes.jsx"></script>
     <script type="text/babel" src="Turnos.jsx"></script>
-    
-    <!-- App Principal (Carga al final) -->
-    <script type="text/babel" src="App.jsx"></script>
+    <script type="text/babel" src="Clientes.jsx"></script>
+    <script type="text/babel" src="Historial.jsx"></script>
+
+    <!-- 3. APP PRINCIPAL (ORQUESTADOR) -->
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- RELLENA TUS DATOS AQUÍ ---
+        const GITHUB_CONFIG = {
+            token: "", 
+            owner: "",
+            repo: "",
+            path: "database.json"
+        };
+
+        const App = () => {
+            const [view, setView] = useState('dashboard');
+            const [db, setDb] = useState({ historial: [], gastos: [], clientes: [], turnos: [] });
+            const [loading, setLoading] = useState(true);
+
+            // Simulación de carga (Aquí deberías usar el fetch que vimos antes)
+            useEffect(() => {
+                setTimeout(() => setLoading(false), 1000);
+            }, []);
+
+            if (loading) return <div className="flex h-screen items-center justify-center text-blue-500 font-bold">INICIANDO SISTEMA...</div>;
+
+            return (
+                <div className="flex min-h-screen">
+                    {/* Sidebar */}
+                    <nav className="w-20 md:w-64 border-r border-white/5 p-4 space-y-2">
+                        <div className="p-4 mb-8 text-center font-black text-xl italic text-blue-500">BPRO</div>
+                        <button onClick={() => setView('dashboard')} className={`sidebar-link w-full p-4 rounded-xl flex items-center gap-3 font-bold ${view === 'dashboard' ? 'active' : ''}`}>
+                            <LucideIcon name="layout-dashboard" /> <span className="hidden md:inline">Dashboard</span>
+                        </button>
+                        <button onClick={() => setView('turnos')} className={`sidebar-link w-full p-4 rounded-xl flex items-center gap-3 font-bold ${view === 'turnos' ? 'active' : ''}`}>
+                            <LucideIcon name="calendar" /> <span className="hidden md:inline">Turnos</span>
+                        </button>
+                    </nav>
+
+                    {/* Contenido Dinámico */}
+                    <main className="flex-1 p-8">
+                        {view === 'dashboard' && <window.DashboardModule services={db.historial} expenses={db.gastos} />}
+                        {view === 'turnos' && <window.TurnosModule />}
+                        {/* Agrega el resto de vistas aquí */}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
