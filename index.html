@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barber Pro Manager | Modular Dashboard</title>
+    
+    <!-- Frameworks & Fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-dark: #020617;
+            --card-bg: rgba(30, 41, 59, 0.4);
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+            margin: 0;
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1.5rem;
+        }
+        .sidebar-link.active {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+        .sidebar-link.active::before {
+            content: ''; position: absolute; left: 0; top: 20%; height: 60%; width: 4px;
+            background: #3b82f6; border-radius: 0 4px 4px 0; box-shadow: 0 0 15px #3b82f6;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        input, select {
+            background: rgba(15, 23, 42, 0.8) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- Módulos de la Aplicación -->
+    <script type="text/babel" src="Dashboard.jsx"></script>
+    <script type="text/babel" src="Historial.jsx"></script>
+    <script type="text/babel" src="Gastos.jsx"></script>
+    <script type="text/babel" src="Clientes.jsx"></script>
+    <script type="text/babel" src="Turnos.jsx"></script>
+    
+    <!-- App Principal (Carga al final) -->
+    <script type="text/babel" src="App.jsx"></script>
+</body>
+</html>
