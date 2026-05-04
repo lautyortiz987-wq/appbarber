@@ -21,6 +21,16 @@
   ],
   "turnos": [
     {
+      "id": "1777883330715",
+      "client": "Isa primo",
+      "phone": "",
+      "time": "18:30",
+      "service": "Degradé / Fade",
+      "price": 5000,
+      "date": "2026-05-01",
+      "status": "pending"
+    },
+    {
       "id": "1777883307540",
       "client": "Diego martinez",
       "phone": "",
