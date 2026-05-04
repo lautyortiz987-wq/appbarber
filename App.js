@@ -6,7 +6,7 @@ const { useState, useEffect, useCallback, useRef } = React;
 
 // --- CONFIGURACIÓN DE GITHUB ---
 const GITHUB_CONFIG = { 
-    token: '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', 
+    token: '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', 
     owner: 'lautyortiz987-wq', 
     repo: 'appbarber',  
     path: 'database.json', 
