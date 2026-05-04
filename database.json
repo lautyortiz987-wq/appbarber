@@ -4,7 +4,15 @@
     "notes": "Configuraciones globales del panel"
   },
   "historial": [],
-  "gastos": [],
+  "gastos": [
+    {
+      "id": 1777856642368,
+      "detail": "asdasd",
+      "amount": 15000,
+      "category": "Insumos",
+      "date": "2026-05-04T01:04:02.368Z"
+    }
+  ],
   "clientes": [],
   "turnos": []
 }
