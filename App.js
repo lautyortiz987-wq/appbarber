@@ -1,9 +1,9 @@
 /**
- * Orquestador Barber Pro v3.0 (GitHub DB Edition)
- * Sistema Integral con Persistencia Real en GitHub.
- * Los datos se mantienen al recargar porque se leen del JSON remoto.
+ * Orquestador Barber Pro v3.1 (GitHub Cloud Persistence)
+ * Centraliza el estado y asegura que los módulos secundarios
+ * guarden los datos permanentemente en GitHub.
  */
-const { useState, useEffect, useCallback, useRef } = React;
+const { useState, useEffect, useCallback } = React;
 
 // --- CONFIGURACIÓN DE GITHUB ---
 const GITHUB_CONFIG = { 
@@ -22,13 +22,13 @@ window.LucideIcon = ({ name, size = 20, className = "" }) => {
 };
 
 const App = () => {
-    const [activeTab, setActiveTab] = useState('resumenes');
-    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState('turnos');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     
-    // Estado centralizado - Esta es la única fuente de verdad
-    const [data, setData] = useState({
+    // Estado único (Fuente de verdad)
+    const [db, setDb] = useState({
         historial: [],
         gastos: [],
         clientes: [],
@@ -37,45 +37,43 @@ const App = () => {
 
     const Icon = window.LucideIcon;
 
-    // --- COMUNICACIÓN CON GITHUB ---
-
-    const loadFromGitHub = useCallback(async () => {
-        if (!GITHUB_CONFIG.token || !GITHUB_CONFIG.owner) {
-            setLoading(false);
-            return;
-        }
+    // --- CARGA DESDE LA NUBE ---
+    const loadData = useCallback(async () => {
+        setLoading(true);
         try {
             const response = await fetch(
                 `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}?ref=${GITHUB_CONFIG.branch}`,
                 { headers: { Authorization: `token ${GITHUB_CONFIG.token}`, 'Cache-Control': 'no-cache' } }
             );
+            
             if (response.ok) {
                 const result = await response.json();
                 const content = JSON.parse(decodeURIComponent(escape(atob(result.content))));
                 
-                // Aseguramos que todas las propiedades existan para evitar errores
-                setData({
+                setDb({
                     historial: content.historial || [],
                     gastos: content.gastos || [],
                     clientes: content.clientes || [],
                     turnos: content.turnos || []
                 });
-                window._github_sha = result.sha;
+                
+                window._current_sha = result.sha;
             }
         } catch (error) {
-            console.error("Error cargando datos de GitHub:", error);
+            console.error("Error al cargar:", error);
         } finally {
             setLoading(false);
         }
     }, []);
 
-    const saveToGitHub = async (newData) => {
-        if (!GITHUB_CONFIG.token || saving) return;
+    useEffect(() => { loadData(); }, [loadData]);
+
+    // --- GUARDADO EN LA NUBE ---
+    const syncToCloud = async (newDbState) => {
+        if (saving) return;
         setSaving(true);
         try {
-            // Usamos una versión limpia del JSON
-            const jsonString = JSON.stringify(newData, null, 2);
-            const content = btoa(unescape(encodeURIComponent(jsonString)));
+            const content = btoa(unescape(encodeURIComponent(JSON.stringify(newDbState, null, 2))));
             
             const response = await fetch(
                 `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}`,
@@ -86,240 +84,147 @@ const App = () => {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        message: `Sincronización Barber Pro: ${new Date().toLocaleString()}`,
+                        message: `Update: ${new Date().toISOString()}`,
                         content: content,
-                        sha: window._github_sha,
+                        sha: window._current_sha,
                         branch: GITHUB_CONFIG.branch
                     })
                 }
             );
             
             if (response.ok) {
-                const result = await response.json();
-                window._github_sha = result.content.sha; // Actualizamos el SHA para la próxima subida
+                const res = await response.json();
+                window._current_sha = res.content.sha;
             } else {
-                // Si falla por SHA desactualizado, re-sincronizamos
-                console.warn("Conflicto de SHA, reintentando sincronización...");
-                await loadFromGitHub();
+                console.warn("Conflicto detectado, re-sincronizando...");
+                await loadData();
             }
         } catch (error) {
-            console.error("Error al guardar en GitHub:", error);
+            console.error("Error al guardar:", error);
         } finally {
             setSaving(false);
         }
     };
 
-    useEffect(() => {
-        loadFromGitHub();
-    }, [loadFromGitHub]);
-
-    // Función genérica para actualizar cualquier parte de la base de datos
-    const updateData = (key, newValue) => {
-        const newData = { ...data, [key]: newValue };
-        setData(newData); // Actualización local inmediata (UI fluida)
-        saveToGitHub(newData); // Sincronización remota
+    // --- ACCIONES CENTRALIZADAS ---
+    const addItem = (key, item) => {
+        const updatedDb = { ...db, [key]: [item, ...(db[key] || [])] };
+        setDb(updatedDb);
+        syncToCloud(updatedDb);
     };
 
-    // --- FUNCIONALIDAD DE WHATSAPP ---
-
-    const handleSendWhatsApp = (turno) => {
-        if (!turno.phone) return;
-        const cleanPhone = turno.phone.replace(/\D/g, '');
-        const message = encodeURIComponent(`¡Hola ${turno.client}! Te recordamos tu turno para el día ${turno.date} a las ${turno.time} (${turno.service}). ¡Te esperamos!`);
-        window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
+    const deleteItem = (key, id) => {
+        const updatedDb = { ...db, [key]: db[key].filter(i => i.id !== id) };
+        setDb(updatedDb);
+        syncToCloud(updatedDb);
     };
-
-    // --- LÓGICA DE NEGOCIO ---
 
     const handleCompleteTurno = (turno) => {
-        if (turno.status === 'completed') return;
-
-        // 1. Marcar turno como completado
-        const turnosActualizados = (data.turnos || []).map(t => 
-            t.id === turno.id ? { ...t, status: 'completed' } : t
-        );
-
-        // 2. Crear entrada en el historial (esto alimenta Resúmenes y Estadísticas)
-        const nuevoServicio = {
+        const updatedTurnos = db.turnos.map(t => t.id === turno.id ? { ...t, status: 'completed' } : t);
+        const newHistorial = [{
             id: Date.now(),
             client: turno.client,
             service: turno.service,
-            price: parseFloat(turno.price || 0),
-            date: new Date().toISOString(),
-            isFromTurno: true
-        };
-        const historialActualizado = [nuevoServicio, ...(data.historial || [])];
+            price: turno.price,
+            date: new Date().toISOString()
+        }, ...db.historial];
 
-        // 3. Actualizar contador de visitas del cliente
-        let clientesActualizados = [...(data.clientes || [])];
-        const clienteIndex = clientesActualizados.findIndex(c => 
-            c.name.toLowerCase() === turno.client.toLowerCase()
-        );
-
-        if (clienteIndex !== -1) {
-            clientesActualizados[clienteIndex] = {
-                ...clientesActualizados[clienteIndex],
-                visits: (clientesActualizados[clienteIndex].visits || 0) + 1,
-                lastVisit: new Date().toISOString()
-            };
-        } else {
-            clientesActualizados.push({
-                id: Date.now() + 1,
-                name: turno.client,
-                phone: turno.phone || '',
-                visits: 1,
-                lastVisit: new Date().toISOString()
-            });
-        }
-
-        const estadoFinal = {
-            ...data,
-            turnos: turnosActualizados,
-            historial: historialActualizado,
-            clientes: clientesActualizados
-        };
-
-        setData(estadoFinal);
-        saveToGitHub(estadoFinal);
+        const updatedDb = { ...db, turnos: updatedTurnos, historial: newHistorial };
+        setDb(updatedDb);
+        syncToCloud(updatedDb);
     };
 
-    const renderModule = () => {
-        if (loading) return (
-            <div className="flex flex-col items-center justify-center py-40">
-                <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-6"></div>
-                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-500 animate-pulse">Cargando base de datos...</p>
+    if (loading) return (
+        <div className="flex items-center justify-center min-h-screen bg-[#020617]">
+            <div className="text-center">
+                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-blue-500 font-black uppercase tracking-[0.3em] text-[10px]">Cargando Barber Pro...</p>
             </div>
-        );
-
-        const commonProps = {
-            services: data.historial || [],
-            expenses: data.gastos || [],
-            clients: data.clientes || []
-        };
-
-        switch(activeTab) {
-            case 'resumenes':
-                return window.DashboardModule ? <window.DashboardModule {...commonProps} /> : null;
-            case 'historial':
-                return window.HistorialModule ? <window.HistorialModule {...commonProps} /> : null;
-            case 'gasto':
-                return window.GastosModule ? 
-                    <window.GastosModule 
-                        expenses={data.gastos} 
-                        onAdd={(e) => updateData('gastos', [e, ...data.gastos])}
-                        onDelete={(id) => updateData('gastos', data.gastos.filter(x => x.id !== id))}
-                    /> : null;
-            case 'clientes':
-                return window.ClientesModule ? 
-                    <window.ClientesModule 
-                        clients={data.clientes} 
-                        setClients={(c) => updateData('clientes', c)} 
-                    /> : null;
-            case 'turnos':
-                return window.TurnosModule ? 
-                    <window.TurnosModule 
-                        appointments={data.turnos || []}
-                        onAdd={(nuevo) => updateData('turnos', [nuevo, ...(data.turnos || [])])}
-                        onDelete={(id) => updateData('turnos', data.turnos.filter(t => t.id !== id))}
-                        onComplete={handleCompleteTurno}
-                        onWhatsApp={handleSendWhatsApp}
-                    /> : null;
-            default: return null;
-        }
-    };
-
-    const totalIngresos = (data.historial || []).reduce((a, b) => a + Number(b.price || 0), 0);
-    const totalGastos = (data.gastos || []).reduce((a, b) => a + Number(b.amount || 0), 0);
-    const balanceTotal = totalIngresos - totalGastos;
+        </div>
+    );
 
     return (
-        <div className="flex min-h-screen relative bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30">
-            <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-950/60 backdrop-blur-xl border-r border-white/5 transition-transform duration-500 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-                <div className="p-10 flex flex-col h-full">
-                    <div className="flex items-center gap-4 mb-14">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-500/20 rotate-3">
-                            <Icon name="scissors" className="text-white" size={24} />
+        <div className="flex min-h-screen bg-[#020617] text-slate-200">
+            {/* Sidebar con tabs corregidos */}
+            <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-950 border-r border-white/5 transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <div className="p-8 h-full flex flex-col">
+                    <div className="flex items-center gap-3 mb-12">
+                        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center rotate-3 shadow-lg shadow-blue-600/20">
+                            <Icon name="scissors" className="text-white" />
                         </div>
                         <div>
-                            <h1 className="font-black text-2xl italic tracking-tighter uppercase leading-none text-white">Barber</h1>
-                            <p className="text-[10px] font-black tracking-[0.4em] text-blue-500 uppercase mt-1">Professional</p>
+                            <h1 className="font-black italic text-xl leading-none">BARBER</h1>
+                            <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest">Enterprise</span>
                         </div>
                     </div>
 
-                    <nav className="space-y-2 flex-1">
-                        <NavItem active={activeTab === 'resumenes'} icon="layout-dashboard" label="Resúmenes" onClick={() => {setActiveTab('resumenes'); setSidebarOpen(false);}} />
-                        <NavItem active={activeTab === 'historial'} icon="bar-chart-3" label="Estadísticas" onClick={() => {setActiveTab('historial'); setSidebarOpen(false);}} />
-                        <NavItem active={activeTab === 'gasto'} icon="wallet" label="Gastos" onClick={() => {setActiveTab('gasto'); setSidebarOpen(false);}} />
-                        <NavItem active={activeTab === 'clientes'} icon="users" label="Clientes" onClick={() => {setActiveTab('clientes'); setSidebarOpen(false);}} />
-                        <NavItem active={activeTab === 'turnos'} icon="calendar-days" label="Turnos" onClick={() => {setActiveTab('turnos'); setSidebarOpen(false);}} />
+                    <nav className="space-y-2">
+                        <TabButton active={activeTab === 'turnos'} icon="calendar" label="Turnos" onClick={() => setActiveTab('turnos')} />
+                        <TabButton active={activeTab === 'gasto'} icon="wallet" label="Gastos" onClick={() => setActiveTab('gasto')} />
+                        <TabButton active={activeTab === 'clientes'} icon="users" label="Clientes" onClick={() => setActiveTab('clientes')} />
+                        <TabButton active={activeTab === 'historial'} icon="bar-chart-3" label="Estadísticas" onClick={() => setActiveTab('historial')} />
                     </nav>
-
-                    <div className="mt-auto pt-6 border-t border-white/5">
-                        <div className="flex items-center gap-3 p-4 rounded-2xl bg-white/5 border border-white/5">
-                            <div className="relative">
-                                <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
-                                    <Icon name="database" size={14} className={saving ? "text-amber-500" : "text-blue-400"} />
-                                </div>
-                                {saving && <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-ping"></div>}
-                            </div>
-                            <div className="overflow-hidden">
-                                <p className="text-[10px] font-bold text-white truncate uppercase tracking-tighter">{saving ? 'Guardando...' : 'GitHub DB'}</p>
-                                <p className="text-[8px] text-emerald-500 font-black uppercase mt-0.5">Sincronizado</p>
+                    
+                    <div className="mt-auto">
+                        <div className={`p-4 rounded-2xl border transition-colors ${saving ? 'border-amber-500/50 bg-amber-500/5' : 'border-emerald-500/20 bg-emerald-500/5'}`}>
+                            <div className="flex items-center gap-3">
+                                <div className={`w-2 h-2 rounded-full ${saving ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+                                <p className="text-[9px] font-black uppercase tracking-tighter text-slate-400">
+                                    {saving ? 'Guardando en GitHub...' : 'Sincronizado'}
+                                </p>
                             </div>
                         </div>
                     </div>
                 </div>
             </aside>
 
-            {sidebarOpen && <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 lg:hidden" onClick={() => setSidebarOpen(false)}></div>}
-
-            <main className="flex-1 lg:ml-72 p-6 lg:p-12 min-h-screen flex flex-col bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900/10 via-slate-950 to-slate-950">
-                <header className="flex justify-between items-center mb-16 relative z-10">
-                    <button className="lg:hidden p-4 bg-white/5 rounded-2xl border border-white/10 text-white" onClick={() => setSidebarOpen(true)}>
-                        <Icon name="menu" size={24} />
+            <main className="flex-1 lg:ml-64 p-6 lg:p-12">
+                <header className="flex justify-between items-center mb-10 lg:hidden">
+                    <button onClick={() => setSidebarOpen(true)} className="p-3 bg-white/5 rounded-xl border border-white/10">
+                        <Icon name="menu" />
                     </button>
-                    
-                    <div className="hidden lg:block">
-                        <h2 className="text-[10px] font-black uppercase text-blue-500 tracking-[0.5em] mb-2">Cloud Infrastructure</h2>
-                        <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${saving ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
-                            <p className="text-slate-100 font-extrabold text-lg italic tracking-tight capitalize">{activeTab}</p>
-                        </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-6">
-                        <div className="hidden sm:flex flex-col text-right">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Balance Total</p>
-                            <p className={`font-black italic text-2xl ${balanceTotal >= 0 ? 'text-white' : 'text-rose-500'}`}>
-                                ${balanceTotal.toLocaleString()}
-                            </p>
-                        </div>
-                        <button 
-                            onClick={loadFromGitHub} 
-                            disabled={loading}
-                            className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer active:scale-95"
-                        >
-                            <Icon name="refresh-cw" size={20} className={`${loading ? 'animate-spin' : ''}`} />
-                        </button>
-                    </div>
+                    <h2 className="font-black italic uppercase text-blue-500">{activeTab}</h2>
                 </header>
 
-                <div className="max-w-7xl mx-auto w-full flex-1 relative">
-                    {renderModule()}
+                <div className="max-w-6xl mx-auto">
+                    {activeTab === 'turnos' && window.TurnosModule && (
+                        <window.TurnosModule 
+                            appointments={db.turnos} 
+                            onAdd={(t) => addItem('turnos', t)}
+                            onDelete={(id) => deleteItem('turnos', id)}
+                            onComplete={handleCompleteTurno}
+                        />
+                    )}
+                    {activeTab === 'gasto' && window.GastosModule && (
+                        <window.GastosModule 
+                            expenses={db.gastos} 
+                            onAdd={(g) => addItem('gastos', g)}
+                            onDelete={(id) => deleteItem('gastos', id)}
+                        />
+                    )}
+                    {activeTab === 'clientes' && window.ClientesModule && (
+                        <window.ClientesModule 
+                            clients={db.clientes} 
+                            setClients={(newList) => {
+                                setDb({ ...db, clientes: newList });
+                                syncToCloud({ ...db, clientes: newList });
+                            }} 
+                        />
+                    )}
+                    {activeTab === 'historial' && window.HistorialModule && (
+                        <window.HistorialModule services={db.historial} expenses={db.gastos} />
+                    )}
                 </div>
-                
-                <footer className="mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[9px] font-black text-slate-600 uppercase tracking-[0.3em]">
-                    <p>Barber Pro Enterprise © 2024</p>
-                    <p className="text-blue-500/50">Base de Datos Centralizada</p>
-                </footer>
             </main>
+
+            {sidebarOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden" onClick={() => setSidebarOpen(false)}></div>}
         </div>
     );
 };
 
-const NavItem = ({ active, icon, label, onClick }) => (
-    <button onClick={onClick} className={`w-full flex items-center gap-5 p-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.1em] transition-all duration-300 group ${active ? 'bg-gradient-to-r from-blue-600/20 to-transparent text-blue-400 border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5 border border-transparent'}`}>
-        <window.LucideIcon name={icon} size={18} className={active ? 'text-blue-400' : 'text-slate-600 group-hover:text-slate-400'} />
+const TabButton = ({ active, icon, label, onClick }) => (
+    <button onClick={onClick} className={`w-full flex items-center gap-4 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${active ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:bg-white/5 hover:text-slate-300'}`}>
+        <window.LucideIcon name={icon} size={16} />
         {label}
     </button>
 );
