@@ -1,14 +1,6 @@
 {
   "historial": [
     {
-      "id": 1777869196980,
-      "client": "Ari",
-      "service": "Degradé / Fade",
-      "price": 20000,
-      "date": "2026-05-04T04:33:16.980Z",
-      "isFromTurno": true
-    },
-    {
       "id": 1777868269323,
       "client": "2222",
       "service": "Corte Clásico",
