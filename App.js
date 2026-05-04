@@ -198,15 +198,12 @@ const App = () => {
         switch(activeTab) {
             case 'resumenes':
                 return window.DashboardModule ? <window.DashboardModule {...commonProps} /> : null;
-            case 'historial':
-                return window.HistorialModule ? <window.HistorialModule {...commonProps} /> : null;
-            case 'gasto':
-                return window.GastosModule ?
-                    <window.GastosModule
-                        expenses={data.gastos}
-                        onAdd={(e) => updateData('gastos', [e, ...data.gastos])}
-                        onDelete={(id) => updateData('gastos', data.gastos.filter(x => x.id !== id))}
-                    /> : null;
+case 'historial':
+    return window.HistorialModule ? 
+        <window.HistorialModule 
+            {...commonProps} 
+            onDeleteService={(id) => updateData('historial', data.historial.filter(s => s.id !== id))}
+        /> : null;
             case 'clientes':
                 return window.ClientesModule ?
                     <window.ClientesModule
