@@ -1,6 +1,6 @@
 /**
  * TurnosModule - Gestión de Agenda e Ingresos
- * Incluye sincronización de precios, estados de cobro y validación de horarios.
+ * Módulo optimizado para trabajar con la persistencia interna del Canvas.
  */
 window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
     const Icon = window.LucideIcon;
@@ -36,6 +36,9 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
         };
     }, [appointments, selectedDate]);
 
+    /**
+     * handleAddAppointment - Guarda el turno usando la persistencia del sistema
+     */
     const handleAddAppointment = async (e) => {
         if (e) {
             e.preventDefault();
@@ -44,12 +47,12 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
         
         if (isSubmitting) return;
 
-        // Validación estricta
+        // Validación estricta antes de intentar guardar
         if (!form.client.trim() || !form.time || !form.price || !form.date) {
             return;
         }
 
-        // Validación de conflicto de horario
+        // Validación de conflicto de horario (opcional pero recomendada)
         const hasConflict = appointments.some(a => a.date === form.date && a.time === form.time);
         if (hasConflict) {
             const confirmDouble = window.confirm("Ya hay un turno a esa hora. ¿Deseas agendarlo igualmente?");
@@ -59,7 +62,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
         setIsSubmitting(true);
         try {
             const newAppointment = {
-                id: Date.now().toString(), // ID único como string
+                id: Date.now().toString(), 
                 client: form.client.trim(),
                 phone: form.phone.trim(),
                 time: form.time,
@@ -69,12 +72,12 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                 status: 'pending'
             };
 
-            // IMPORTANTE: Llamamos a onAdd que es la que guarda en la base de datos real del Canvas
+            // IMPORTANTE: onAdd es la función que guarda en la base de datos real del entorno
             if (onAdd) {
                 await onAdd(newAppointment);
             }
             
-            // Limpiar formulario pero mantener la fecha para seguir agendando ese día
+            // Resetear campos manteniendo la fecha
             setForm({ 
                 ...initialState, 
                 date: form.date,
