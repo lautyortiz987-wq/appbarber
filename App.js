@@ -1,17 +1,8 @@
 /**
- * Orquestador Barber Pro v3.1 (GitHub DB Edition - Optimized Persistence)
- * Sistema con cola de guardado inteligente para evitar conflictos de SHA.
+ * Orquestador Barber Pro v3.2 (Vercel Proxy Edition)
+ * Usa /api/db como proxy para evitar CORS con GitHub API.
  */
 const { useState, useEffect, useCallback, useRef } = React;
-
-// --- CONFIGURACIÓN DE GITHUB ---
-const GITHUB_CONFIG = { 
-    token: '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', 
-    owner: 'lautyortiz987-wq', 
-    repo: 'appbarber',  
-    path: 'database.json', 
-    branch: 'main'
-};
 
 window.LucideIcon = ({ name, size = 20, className = "" }) => {
     useEffect(() => {
@@ -26,7 +17,6 @@ const App = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     
-    // Referencias para el sistema de guardado optimizado
     const saveTimeoutRef = useRef(null);
     const isSavingRef = useRef(false);
     const pendingDataRef = useRef(null);
@@ -40,52 +30,36 @@ const App = () => {
 
     const Icon = window.LucideIcon;
 
-    // --- COMUNICACIÓN CON GITHUB (MEJORADA) ---
-
+    // --- CARGA DESDE PROXY ---
     const loadFromGitHub = useCallback(async () => {
-    console.log("🔄 Intentando cargar desde GitHub...");
-    console.log("Config:", { owner: GITHUB_CONFIG.owner, repo: GITHUB_CONFIG.repo, path: GITHUB_CONFIG.path });
-    
-    if (!GITHUB_CONFIG.token || !GITHUB_CONFIG.owner) {
-        console.error("❌ Falta token u owner");
-        setLoading(false);
-        return;
-    }
-    try {
-        const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}?ref=${GITHUB_CONFIG.branch}`;
-        console.log("📡 URL:", url);
-        
-        const response = await fetch(url, { 
-            headers: { 
-                Authorization: `token ${GITHUB_CONFIG.token}`, 
-                'Cache-Control': 'no-cache' 
-            } 
-        });
-        
-        console.log("📬 Status de respuesta:", response.status, response.statusText);
-        
-        if (response.ok) {
-            const result = await response.json();
-            const content = JSON.parse(decodeURIComponent(escape(atob(result.content))));
-            console.log("✅ Datos cargados:", content);
-            setData({
-                historial: content.historial || [],
-                gastos: content.gastos || [],
-                clientes: content.clientes || [],
-                turnos: content.turnos || []
-            });
-            window._github_sha = result.sha;
-        } else {
-            const errorBody = await response.json();
-            console.error("❌ Error de GitHub:", errorBody);
-        }
-    } catch (error) {
-        console.error("💥 Error de red/JS:", error);
-    } finally {
-        setLoading(false);
-    }
-}, []);
+        console.log("🔄 Cargando datos via proxy /api/db...");
+        try {
+            const response = await fetch('/api/db');
+            console.log("📬 Status:", response.status);
 
+            if (response.ok) {
+                const result = await response.json();
+                const content = JSON.parse(decodeURIComponent(escape(atob(result.content))));
+                console.log("✅ Datos cargados:", content);
+                setData({
+                    historial: content.historial || [],
+                    gastos: content.gastos || [],
+                    clientes: content.clientes || [],
+                    turnos: content.turnos || []
+                });
+                window._github_sha = result.sha;
+            } else {
+                const err = await response.json();
+                console.error("❌ Error del proxy:", err);
+            }
+        } catch (error) {
+            console.error("💥 Error de red:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // --- GUARDADO VIA PROXY ---
     const executeSave = async (newData) => {
         if (isSavingRef.current) {
             pendingDataRef.current = newData;
@@ -98,38 +72,32 @@ const App = () => {
         try {
             const jsonString = JSON.stringify(newData, null, 2);
             const content = btoa(unescape(encodeURIComponent(jsonString)));
-            
-            const response = await fetch(
-                `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}`,
-                {
-                    method: 'PUT',
-                    headers: {
-                        Authorization: `token ${GITHUB_CONFIG.token}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        message: `Sincronización Barber Pro: ${new Date().toLocaleString()}`,
-                        content: content,
-                        sha: window._github_sha,
-                        branch: GITHUB_CONFIG.branch
-                    })
-                }
-            );
-            
+
+            const response = await fetch('/api/db', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: `Sincronización Barber Pro: ${new Date().toLocaleString()}`,
+                    content: content,
+                    sha: window._github_sha,
+                    branch: 'main'
+                })
+            });
+
             if (response.ok) {
                 const result = await response.json();
                 window._github_sha = result.content.sha;
+                console.log("✅ Guardado exitoso");
             } else {
-                console.warn("Conflicto de SHA detectado, re-sincronizando...");
-                await loadFromGitHub(); // Recargamos para obtener el SHA correcto
+                console.warn("⚠️ Conflicto de SHA, re-sincronizando...");
+                await loadFromGitHub();
             }
         } catch (error) {
-            console.error("Error crítico al guardar:", error);
+            console.error("💥 Error al guardar:", error);
         } finally {
             isSavingRef.current = false;
             setSaving(false);
-            
-            // Si hubo cambios mientras guardábamos, procesar el último cambio pendiente
+
             if (pendingDataRef.current) {
                 const dataToSave = pendingDataRef.current;
                 pendingDataRef.current = null;
@@ -139,16 +107,13 @@ const App = () => {
     };
 
     const updateData = (key, newValue) => {
-        // 1. Actualización inmediata de la UI
         const newData = { ...data, [key]: newValue };
         setData(newData);
 
-        // 2. Sistema de Debounce: Esperamos 1.5 segundos de inactividad antes de subir a GitHub
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        
         saveTimeoutRef.current = setTimeout(() => {
             executeSave(newData);
-        }, 1500); 
+        }, 1500);
     };
 
     useEffect(() => {
@@ -170,7 +135,7 @@ const App = () => {
     const handleCompleteTurno = (turno) => {
         if (turno.status === 'completed') return;
 
-        const turnosActualizados = (data.turnos || []).map(t => 
+        const turnosActualizados = (data.turnos || []).map(t =>
             t.id === turno.id ? { ...t, status: 'completed' } : t
         );
 
@@ -185,7 +150,7 @@ const App = () => {
         const historialActualizado = [nuevoServicio, ...(data.historial || [])];
 
         let clientesActualizados = [...(data.clientes || [])];
-        const clienteIndex = clientesActualizados.findIndex(c => 
+        const clienteIndex = clientesActualizados.findIndex(c =>
             c.name.toLowerCase() === turno.client.toLowerCase()
         );
 
@@ -236,21 +201,21 @@ const App = () => {
             case 'historial':
                 return window.HistorialModule ? <window.HistorialModule {...commonProps} /> : null;
             case 'gasto':
-                return window.GastosModule ? 
-                    <window.GastosModule 
-                        expenses={data.gastos} 
+                return window.GastosModule ?
+                    <window.GastosModule
+                        expenses={data.gastos}
                         onAdd={(e) => updateData('gastos', [e, ...data.gastos])}
                         onDelete={(id) => updateData('gastos', data.gastos.filter(x => x.id !== id))}
                     /> : null;
             case 'clientes':
-                return window.ClientesModule ? 
-                    <window.ClientesModule 
-                        clients={data.clientes} 
-                        setClients={(c) => updateData('clientes', c)} 
+                return window.ClientesModule ?
+                    <window.ClientesModule
+                        clients={data.clientes}
+                        setClients={(c) => updateData('clientes', c)}
                     /> : null;
             case 'turnos':
-                return window.TurnosModule ? 
-                    <window.TurnosModule 
+                return window.TurnosModule ?
+                    <window.TurnosModule
                         appointments={data.turnos || []}
                         onAdd={(nuevo) => updateData('turnos', [nuevo, ...(data.turnos || [])])}
                         onDelete={(id) => updateData('turnos', data.turnos.filter(t => t.id !== id))}
@@ -354,8 +319,8 @@ const App = () => {
 
 const NavItem = ({ active, icon, label, onClick }) => (
     <button onClick={onClick} className={`w-full flex items-center gap-5 p-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.1em] transition-all duration-300 group ${active ? 'bg-gradient-to-r from-blue-600/20 to-transparent text-blue-400 border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5 border border-transparent'}`}>
-        <window.LucideIcon name={icon} size={18} className={active ? 'text-blue-400' : 'text-slate-600 group-hover:text-slate-400'} />
-        {label}
+    <window.LucideIcon name={icon} size={18} className={active ? 'text-blue-400' : 'text-slate-600 group-hover:text-slate-400'} />
+    {label}
     </button>
 );
 
