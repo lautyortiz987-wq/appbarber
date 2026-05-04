@@ -1,14 +1,5 @@
 {
-  "historial": [
-    {
-      "id": 1777868269323,
-      "client": "2222",
-      "service": "Corte Clásico",
-      "price": 2222,
-      "date": "2026-05-04T04:17:49.323Z",
-      "isFromTurno": true
-    }
-  ],
+  "historial": [],
   "gastos": [],
   "clientes": [],
   "turnos": []
