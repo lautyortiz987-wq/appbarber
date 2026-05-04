@@ -59,6 +59,16 @@
   ],
   "turnos": [
     {
+      "id": "1777930166688",
+      "client": "Abuelo ricky",
+      "phone": "",
+      "time": "18:00",
+      "service": "Corte Clásico",
+      "price": 5000,
+      "date": "2026-05-04",
+      "status": "pending"
+    },
+    {
       "id": "1777883362505",
       "client": "Papa",
       "phone": "",
