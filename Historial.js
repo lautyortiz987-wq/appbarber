@@ -2,7 +2,7 @@
  * HistorialModule - Panel de Estadísticas Avanzadas
  * Con soporte para eliminar ventas del historial.
  */
-window.HistorialModule = ({ services, expenses, onDeleteService }) => {
+window.HistorialModule = ({ services, expenses, onDeleteService, onDeleteExpense }) => {
     const Icon = window.LucideIcon;
     const [confirmId, setConfirmId] = React.useState(null);
     const [showAll, setShowAll] = React.useState(false);
@@ -28,8 +28,9 @@ window.HistorialModule = ({ services, expenses, onDeleteService }) => {
 
     const visibleMovements = showAll ? allMovements : allMovements.slice(0, 8);
 
-    const handleDelete = (id) => {
-        if (onDeleteService) onDeleteService(id);
+    const handleDelete = (id, isService) => {
+        if (isService && onDeleteService) onDeleteService(id);
+        if (!isService && onDeleteExpense) onDeleteExpense(id);
         setConfirmId(null);
     };
 
@@ -173,32 +174,30 @@ window.HistorialModule = ({ services, expenses, onDeleteService }) => {
                                             {isService ? `+$${Number(item.price).toLocaleString()}` : `-$${Number(item.amount).toLocaleString()}`}
                                         </td>
                                         <td className="py-4 text-right">
-                                            {isService && (
-                                                isConfirming ? (
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <span className="text-[9px] text-slate-400 uppercase font-black">¿Seguro?</span>
-                                                        <button
-                                                            onClick={() => handleDelete(item.id)}
-                                                            className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white text-[9px] font-black uppercase rounded-lg transition-all"
-                                                        >
-                                                            Sí
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setConfirmId(null)}
-                                                            className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white text-[9px] font-black uppercase rounded-lg transition-all"
-                                                        >
-                                                            No
-                                                        </button>
-                                                    </div>
-                                                ) : (
+                                            {isConfirming ? (
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <span className="text-[9px] text-slate-400 uppercase font-black">¿Seguro?</span>
                                                     <button
-                                                        onClick={() => setConfirmId(item.id)}
-                                                        className="opacity-0 group-hover:opacity-100 p-2 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
-                                                        title="Eliminar venta"
+                                                        onClick={() => handleDelete(item.id, isService)}
+                                                        className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white text-[9px] font-black uppercase rounded-lg transition-all"
                                                     >
-                                                        <Icon name="trash-2" size={15} />
+                                                        Sí
                                                     </button>
-                                                )
+                                                    <button
+                                                        onClick={() => setConfirmId(null)}
+                                                        className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white text-[9px] font-black uppercase rounded-lg transition-all"
+                                                    >
+                                                        No
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setConfirmId(item.id)}
+                                                    className="opacity-0 group-hover:opacity-100 p-2 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
+                                                    title="Eliminar"
+                                                >
+                                                    <Icon name="trash-2" size={15} />
+                                                </button>
                                             )}
                                         </td>
                                     </tr>
