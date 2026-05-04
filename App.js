@@ -5,12 +5,11 @@
 const { useState, useEffect, useCallback } = React;
 
 // --- CONFIGURACIÓN DE GITHUB ---
-// Debes completar estos datos para que la persistencia funcione
 const GITHUB_CONFIG = { 
-    token: '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', // Tu Personal Access Token de GitHub
-    owner: 'lautyortiz987-wq', // Tu usuario de GitHub
-    repo: 'appbarber',  // Nombre del repositorio
-    path: 'database.json', // Nombre del archivo .json en el repo
+    token: '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', 
+    owner: 'lautyortiz987-wq', 
+    repo: 'appbarber',  
+    path: 'database.json', 
     branch: 'main'
 };
 
@@ -23,12 +22,11 @@ window.LucideIcon = ({ name, size = 20, className = "" }) => {
 };
 
 const App = () => {
-    const [activeTab, setActiveTab] = useState('resumenes');
+    const [activeTab, setActiveTab] = useState('turnos');
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     
-    // Estado Centralizado - Mapeado a las claves de tu database.json
     const [data, setData] = useState({
         historial: [],
         gastos: [],
@@ -40,7 +38,6 @@ const App = () => {
 
     // --- LÓGICA DE GITHUB API ---
 
-    // Cargar datos desde GitHub
     const loadFromGitHub = useCallback(async () => {
         if (!GITHUB_CONFIG.token || !GITHUB_CONFIG.owner) {
             setLoading(false);
@@ -57,9 +54,8 @@ const App = () => {
 
             if (response.ok) {
                 const result = await response.json();
-                const content = JSON.parse(atob(result.content)); // Decodificar Base64
+                const content = JSON.parse(atob(result.content));
                 setData(content);
-                // Guardar el SHA para futuras actualizaciones
                 window._github_sha = result.sha;
             }
         } catch (error) {
@@ -69,13 +65,12 @@ const App = () => {
         }
     }, []);
 
-    // Guardar datos en GitHub
     const saveToGitHub = async (newData) => {
         if (!GITHUB_CONFIG.token) return;
         setSaving(true);
 
         try {
-            const content = btoa(JSON.stringify(newData, null, 2)); // Convertir a Base64
+            const content = btoa(JSON.stringify(newData, null, 2));
             
             const response = await fetch(
                 `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}`,
@@ -88,7 +83,7 @@ const App = () => {
                     body: JSON.stringify({
                         message: `Update database: ${new Date().toLocaleString()}`,
                         content: content,
-                        sha: window._github_sha, // Necesario para actualizar
+                        sha: window._github_sha,
                         branch: GITHUB_CONFIG.branch
                     })
                 }
@@ -96,7 +91,7 @@ const App = () => {
 
             if (response.ok) {
                 const result = await response.json();
-                window._github_sha = result.content.sha; // Actualizar SHA
+                window._github_sha = result.content.sha;
             }
         } catch (error) {
             console.error("Error guardando en GitHub:", error);
@@ -109,7 +104,6 @@ const App = () => {
         loadFromGitHub();
     }, [loadFromGitHub]);
 
-    // Handlers de actualización de estado
     const updateData = (key, newValue) => {
         const newData = { ...data, [key]: newValue };
         setData(newData);
@@ -154,7 +148,12 @@ const App = () => {
                 return window.TurnosModule ? 
                     <window.TurnosModule 
                         appointments={data.turnos || []}
-                        setAppointments={(a) => updateData('turnos', a)}
+                        onAdd={(nuevo) => updateData('turnos', [...(data.turnos || []), nuevo])}
+                        onDelete={(id) => updateData('turnos', (data.turnos || []).filter(t => t.id !== id))}
+                        onComplete={(turno) => {
+                            const actualizados = data.turnos.map(t => t.id === turno.id ? {...t, status: 'completed'} : t);
+                            updateData('turnos', actualizados);
+                        }}
                     /> : <div className="text-center py-20 italic text-slate-500">Cargando Agenda...</div>;
             default: return null;
         }
@@ -200,10 +199,8 @@ const App = () => {
                 </div>
             </aside>
 
-            {/* Overlay Móvil */}
             {sidebarOpen && <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 lg:hidden transition-opacity" onClick={() => setSidebarOpen(false)}></div>}
 
-            {/* Contenido Principal */}
             <main className="flex-1 lg:ml-72 p-6 lg:p-12 min-h-screen flex flex-col bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900/10 via-slate-950 to-slate-950">
                 <header className="flex justify-between items-center mb-16 relative z-10">
                     <button className="lg:hidden p-4 bg-white/5 rounded-2xl border border-white/10 text-white" onClick={() => setSidebarOpen(true)}>
@@ -242,7 +239,7 @@ const App = () => {
                             <Icon name="alert-circle" className="text-rose-500 mx-auto mb-4" size={40} />
                             <h3 className="text-white font-black uppercase tracking-widest mb-2">Falta Configuración</h3>
                             <p className="text-slate-400 text-sm max-w-md mx-auto">
-                                Para guardar datos en tu JSON de GitHub, necesitas configurar el Token y los datos del repo en el código fuente (objeto GITHUB_CONFIG).
+                                Para guardar datos en tu JSON de GitHub, necesitas configurar el Token y los datos del repo en el código fuente.
                             </p>
                         </div>
                     ) : renderModule()}
