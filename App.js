@@ -43,33 +43,48 @@ const App = () => {
     // --- COMUNICACIÓN CON GITHUB (MEJORADA) ---
 
     const loadFromGitHub = useCallback(async () => {
-        if (!GITHUB_CONFIG.token || !GITHUB_CONFIG.owner) {
-            setLoading(false);
-            return;
+    console.log("🔄 Intentando cargar desde GitHub...");
+    console.log("Config:", { owner: GITHUB_CONFIG.owner, repo: GITHUB_CONFIG.repo, path: GITHUB_CONFIG.path });
+    
+    if (!GITHUB_CONFIG.token || !GITHUB_CONFIG.owner) {
+        console.error("❌ Falta token u owner");
+        setLoading(false);
+        return;
+    }
+    try {
+        const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}?ref=${GITHUB_CONFIG.branch}`;
+        console.log("📡 URL:", url);
+        
+        const response = await fetch(url, { 
+            headers: { 
+                Authorization: `token ${GITHUB_CONFIG.token}`, 
+                'Cache-Control': 'no-cache' 
+            } 
+        });
+        
+        console.log("📬 Status de respuesta:", response.status, response.statusText);
+        
+        if (response.ok) {
+            const result = await response.json();
+            const content = JSON.parse(decodeURIComponent(escape(atob(result.content))));
+            console.log("✅ Datos cargados:", content);
+            setData({
+                historial: content.historial || [],
+                gastos: content.gastos || [],
+                clientes: content.clientes || [],
+                turnos: content.turnos || []
+            });
+            window._github_sha = result.sha;
+        } else {
+            const errorBody = await response.json();
+            console.error("❌ Error de GitHub:", errorBody);
         }
-        try {
-            const response = await fetch(
-                `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}?ref=${GITHUB_CONFIG.branch}`,
-                { headers: { Authorization: `token ${GITHUB_CONFIG.token}`, 'Cache-Control': 'no-cache' } }
-            );
-            if (response.ok) {
-                const result = await response.json();
-                const content = JSON.parse(decodeURIComponent(escape(atob(result.content))));
-                
-                setData({
-                    historial: content.historial || [],
-                    gastos: content.gastos || [],
-                    clientes: content.clientes || [],
-                    turnos: content.turnos || []
-                });
-                window._github_sha = result.sha;
-            }
-        } catch (error) {
-            console.error("Error cargando datos de GitHub:", error);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    } catch (error) {
+        console.error("💥 Error de red/JS:", error);
+    } finally {
+        setLoading(false);
+    }
+}, []);
 
     const executeSave = async (newData) => {
         if (isSavingRef.current) {
