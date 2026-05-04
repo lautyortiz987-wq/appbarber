@@ -203,6 +203,7 @@ const App = () => {
                     <window.HistorialModule
                         {...commonProps}
                         onDeleteService={(id) => updateData('historial', data.historial.filter(s => s.id !== id))}
+                        onDeleteExpense={(id) => updateData('gastos', data.gastos.filter(e => e.id !== id))}
                     /> : null;
             case 'gasto':
                 return window.GastosModule ?
