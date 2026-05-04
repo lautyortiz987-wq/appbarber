@@ -17,15 +17,7 @@
       "isFromTurno": true
     }
   ],
-  "gastos": [
-    {
-      "id": 1777868259947,
-      "detail": "dasdasd",
-      "amount": 222222,
-      "category": "Insumos",
-      "date": "2026-05-04T04:17:39.947Z"
-    }
-  ],
+  "gastos": [],
   "clientes": [
     {
       "id": 1777868269324,
