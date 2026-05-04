@@ -1,6 +1,7 @@
 /**
- * Orquestador Barber Pro v2.8 (GitHub DB Edition)
+ * Orquestador Barber Pro v2.9 (GitHub DB Edition)
  * Sistema Integral: Gestión de Turnos, Historial, Clientes y Finanzas.
+ * Incluye integración con WhatsApp para recordatorios.
  */
 const { useState, useEffect, useCallback, useRef } = React;
 
@@ -25,7 +26,6 @@ const App = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const isInitialMount = useRef(true);
     
     const [data, setData] = useState({
         historial: [],
@@ -91,7 +91,6 @@ const App = () => {
                 const result = await response.json();
                 window._github_sha = result.content.sha;
             } else {
-                // Si hay conflicto de SHA, intentar recargar
                 loadFromGitHub();
             }
         } catch (error) {
@@ -111,17 +110,27 @@ const App = () => {
         saveToGitHub(newData);
     };
 
+    // --- FUNCIONALIDAD DE WHATSAPP ---
+
+    const handleSendWhatsApp = (turno) => {
+        if (!turno.phone) {
+            // Podrías mostrar un mensaje de error personalizado aquí
+            return;
+        }
+        const cleanPhone = turno.phone.replace(/\D/g, '');
+        const message = encodeURIComponent(`¡Hola ${turno.client}! Te recordamos tu turno en Barber Pro para el día ${turno.date} a las ${turno.time} para un ${turno.service}. ¡Te esperamos!`);
+        window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
+    };
+
     // --- PROCESAMIENTO DE NEGOCIO ---
 
     const handleCompleteTurno = (turno) => {
         if (turno.status === 'completed') return;
 
-        // 1. Actualizar estado del turno
         const turnosActualizados = data.turnos.map(t => 
             t.id === turno.id ? { ...t, status: 'completed' } : t
         );
 
-        // 2. Registrar en Historial
         const nuevoServicio = {
             id: Date.now(),
             client: turno.client,
@@ -132,7 +141,6 @@ const App = () => {
         };
         const historialActualizado = [nuevoServicio, ...(data.historial || [])];
 
-        // 3. Actualizar o crear Cliente automáticamente
         let clientesActualizados = [...(data.clientes || [])];
         const clienteIndex = clientesActualizados.findIndex(c => 
             c.name.toLowerCase() === turno.client.toLowerCase()
@@ -204,6 +212,7 @@ const App = () => {
                         onAdd={(nuevo) => updateData('turnos', [nuevo, ...(data.turnos || [])])}
                         onDelete={(id) => updateData('turnos', data.turnos.filter(t => t.id !== id))}
                         onComplete={handleCompleteTurno}
+                        onWhatsApp={handleSendWhatsApp}
                     /> : null;
             default: return null;
         }
@@ -213,7 +222,6 @@ const App = () => {
 
     return (
         <div className="flex min-h-screen relative bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30">
-            {/* Sidebar con efecto Glassmorphism */}
             <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-950/60 backdrop-blur-xl border-r border-white/5 transition-transform duration-500 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="p-10 flex flex-col h-full">
                     <div className="flex items-center gap-4 mb-14">
