@@ -19,6 +19,11 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
     const [form, setForm] = React.useState(initialState);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+    // Sincronizar la fecha del formulario si cambia la fecha seleccionada globalmente
+    React.useEffect(() => {
+        setForm(prev => ({ ...prev, date: selectedDate }));
+    }, [selectedDate]);
+
     // Cálculos de ingresos y estadísticas del día
     const stats = React.useMemo(() => {
         const dayApps = appointments.filter(a => a.date === selectedDate);
@@ -47,26 +52,36 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
         // Validación de conflicto de horario
         const hasConflict = appointments.some(a => a.date === form.date && a.time === form.time);
         if (hasConflict) {
-            const confirmDouble = window.confirm("Ya hay un turno a esa hora. ¿Agendar de todas formas?");
+            const confirmDouble = window.confirm("Ya hay un turno a esa hora. ¿Deseas agendarlo igualmente?");
             if (!confirmDouble) return;
         }
 
         setIsSubmitting(true);
         try {
+            const newAppointment = {
+                id: Date.now(),
+                client: form.client.trim(),
+                phone: form.phone.trim(),
+                time: form.time,
+                service: form.service,
+                price: parseFloat(form.price),
+                date: form.date,
+                status: 'pending'
+            };
+
             if (onAdd) {
-                await onAdd({
-                    id: Date.now(),
-                    client: form.client.trim(),
-                    phone: form.phone.trim(),
-                    time: form.time,
-                    service: form.service,
-                    price: parseFloat(form.price),
-                    date: form.date,
-                    status: 'pending'
-                });
+                await onAdd(newAppointment);
             }
+            
             // Limpiar formulario pero mantener la fecha para seguir agendando ese día
-            setForm({ ...initialState, date: form.date });
+            setForm({ 
+                ...initialState, 
+                date: form.date,
+                client: '',
+                phone: '',
+                time: '',
+                price: ''
+            });
         } catch (error) {
             console.error("Error al agendar:", error);
         } finally {
@@ -80,7 +95,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
         .sort((a, b) => a.time.localeCompare(b.time));
 
     const sendWhatsApp = (app) => {
-        const message = `Hola ${app.client}! Te recordamos tu turno en la barbería para el día ${app.date} a las ${app.time}hs por un ${app.service}. ¡Te esperamos!`;
+        const message = `Hola ${app.client}! Te recordamos tu turno en la barbería para el día ${app.date} a las ${app.time}hs. ¡Te esperamos!`;
         const phone = app.phone.replace(/\D/g, '');
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
     };
@@ -100,7 +115,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                     <form className="space-y-4" onSubmit={handleAddAppointment}>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="col-span-2">
-                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Fecha del Turno</label>
+                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Fecha</label>
                                 <input 
                                     type="date" 
                                     className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white focus:ring-2 focus:ring-blue-500/50"
@@ -113,10 +128,10 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                 />
                             </div>
                             <div className="col-span-2">
-                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Nombre Cliente</label>
+                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Cliente</label>
                                 <input 
                                     className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white"
-                                    placeholder="Ej: Juan Pérez"
+                                    placeholder="Nombre del cliente"
                                     value={form.client}
                                     onChange={e => setForm({...form, client: e.target.value})}
                                     required
@@ -126,7 +141,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                 <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">WhatsApp (Opcional)</label>
                                 <input 
                                     className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white"
-                                    placeholder="Ej: 1122334455"
+                                    placeholder="Sin 0 ni 15"
                                     value={form.phone}
                                     onChange={e => setForm({...form, phone: e.target.value})}
                                 />
@@ -157,7 +172,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                         <div>
                             <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Servicio</label>
                             <select 
-                                className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white text-sm appearance-none cursor-pointer"
+                                className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white text-sm cursor-pointer"
                                 value={form.service}
                                 onChange={e => setForm({...form, service: e.target.value})}
                             >
@@ -166,7 +181,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                 <option value="Barba / Perfilado">Barba / Perfilado</option>
                                 <option value="Corte + Barba">Corte + Barba</option>
                                 <option value="Tratamiento Capilar">Tratamiento Capilar</option>
-                                <option value="Color Global">Color Global</option>
+                                <option value="Color / Reflejos">Color / Reflejos</option>
                             </select>
                         </div>
 
@@ -180,16 +195,15 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                     </form>
                 </div>
 
-                {/* Resumen Financiero Dinámico */}
                 <div className="glass-card p-6 border-emerald-500/10 bg-emerald-500/5 rounded-3xl">
-                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Estimación de Hoy</p>
+                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Caja Estimada Hoy</p>
                     <div className="flex justify-between items-end">
                         <div>
-                            <p className="text-xs text-slate-400 font-bold mb-1">Por cobrar: ${stats.projectedIncome - stats.realIncome}</p>
+                            <p className="text-xs text-slate-400 font-bold mb-1">Total Cobrado:</p>
                             <p className="text-3xl font-black text-white italic tracking-tighter">${stats.realIncome}</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">COBRADO</p>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase">Por cobrar: ${stats.projectedIncome - stats.realIncome}</p>
                         </div>
                     </div>
                 </div>
@@ -199,7 +213,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
             <div className="lg:col-span-2 space-y-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2">
                     <div>
-                        <h3 className="text-slate-100 font-extrabold text-2xl italic tracking-tight uppercase">Agenda de Hoy</h3>
+                        <h3 className="text-slate-100 font-extrabold text-2xl italic tracking-tight uppercase">Agenda</h3>
                         <p className="text-blue-500 text-[10px] font-black uppercase tracking-widest mt-1">
                             {new Date(selectedDate + "T12:00:00").toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
                         </p>
@@ -215,16 +229,6 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                             />
-                        </div>
-                        <div className="flex gap-2 shrink-0">
-                            <div className="text-right px-4 border-r border-white/10">
-                                <p className="text-[8px] font-black text-slate-500 uppercase">Espera</p>
-                                <p className="text-lg font-black text-white">{stats.total - stats.completed}</p>
-                            </div>
-                            <div className="text-right px-2">
-                                <p className="text-[8px] font-black text-emerald-500 uppercase">Atendidos</p>
-                                <p className="text-lg font-black text-emerald-500">{stats.completed}</p>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -263,13 +267,13 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                             
                             <div className="flex items-center gap-2">
                                 {/* Botón Recordatorio WhatsApp */}
-                                {!app.status === 'completed' && app.phone && (
+                                {app.status !== 'completed' && app.phone && (
                                     <button 
                                         onClick={() => sendWhatsApp(app)}
                                         className="p-3 text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-2xl transition-all"
-                                        title="Enviar Recordatorio"
+                                        title="Enviar WhatsApp"
                                     >
-                                        <Icon name="message-square" size={20} />
+                                        <Icon name="message-circle" size={20} />
                                     </button>
                                 )}
 
@@ -277,7 +281,6 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                     <button 
                                         onClick={() => onComplete && onComplete(app)}
                                         className="flex flex-col items-center gap-1 p-3 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-500 hover:text-white rounded-2xl transition-all group/btn shadow-lg"
-                                        title="Cobrar Turno"
                                     >
                                         <Icon name="dollar-sign" size={20} className="group-hover/btn:scale-110 transition-transform" />
                                         <span className="text-[8px] font-black uppercase tracking-tighter">Cobrar</span>
@@ -300,7 +303,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                         <div className="glass-card p-20 text-center flex flex-col items-center justify-center border-2 border-dashed border-slate-800 bg-transparent rounded-3xl">
                             <Icon name="calendar-x" size={48} className="text-slate-800 mb-4" />
                             <p className="text-slate-600 font-black uppercase italic tracking-widest text-sm">
-                                {searchTerm ? 'No hay coincidencias' : 'Sin citas para esta fecha'}
+                                {searchTerm ? 'Sin coincidencias' : 'Sin turnos para esta fecha'}
                             </p>
                         </div>
                     )}
