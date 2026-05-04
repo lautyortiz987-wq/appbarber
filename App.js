@@ -1,7 +1,7 @@
 /**
- * Orquestador Barber Pro v2.9 (GitHub DB Edition)
- * Sistema Integral: Gestión de Turnos, Historial, Clientes y Finanzas.
- * Incluye integración con WhatsApp para recordatorios.
+ * Orquestador Barber Pro v3.0 (GitHub DB Edition)
+ * Sistema Integral con Persistencia Real en GitHub.
+ * Los datos se mantienen al recargar porque se leen del JSON remoto.
  */
 const { useState, useEffect, useCallback, useRef } = React;
 
@@ -27,6 +27,7 @@ const App = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     
+    // Estado centralizado - Esta es la única fuente de verdad
     const [data, setData] = useState({
         historial: [],
         gastos: [],
@@ -50,7 +51,9 @@ const App = () => {
             );
             if (response.ok) {
                 const result = await response.json();
-                const content = JSON.parse(atob(result.content));
+                const content = JSON.parse(decodeURIComponent(escape(atob(result.content))));
+                
+                // Aseguramos que todas las propiedades existan para evitar errores
                 setData({
                     historial: content.historial || [],
                     gastos: content.gastos || [],
@@ -60,7 +63,7 @@ const App = () => {
                 window._github_sha = result.sha;
             }
         } catch (error) {
-            console.error("Error cargando datos:", error);
+            console.error("Error cargando datos de GitHub:", error);
         } finally {
             setLoading(false);
         }
@@ -70,7 +73,10 @@ const App = () => {
         if (!GITHUB_CONFIG.token || saving) return;
         setSaving(true);
         try {
-            const content = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
+            // Usamos una versión limpia del JSON
+            const jsonString = JSON.stringify(newData, null, 2);
+            const content = btoa(unescape(encodeURIComponent(jsonString)));
+            
             const response = await fetch(
                 `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}`,
                 {
@@ -80,21 +86,24 @@ const App = () => {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        message: `Auto-Sync: ${new Date().toLocaleString()}`,
+                        message: `Sincronización Barber Pro: ${new Date().toLocaleString()}`,
                         content: content,
                         sha: window._github_sha,
                         branch: GITHUB_CONFIG.branch
                     })
                 }
             );
+            
             if (response.ok) {
                 const result = await response.json();
-                window._github_sha = result.content.sha;
+                window._github_sha = result.content.sha; // Actualizamos el SHA para la próxima subida
             } else {
-                loadFromGitHub();
+                // Si falla por SHA desactualizado, re-sincronizamos
+                console.warn("Conflicto de SHA, reintentando sincronización...");
+                await loadFromGitHub();
             }
         } catch (error) {
-            console.error("Error al guardar en la nube:", error);
+            console.error("Error al guardar en GitHub:", error);
         } finally {
             setSaving(false);
         }
@@ -104,33 +113,33 @@ const App = () => {
         loadFromGitHub();
     }, [loadFromGitHub]);
 
+    // Función genérica para actualizar cualquier parte de la base de datos
     const updateData = (key, newValue) => {
         const newData = { ...data, [key]: newValue };
-        setData(newData);
-        saveToGitHub(newData);
+        setData(newData); // Actualización local inmediata (UI fluida)
+        saveToGitHub(newData); // Sincronización remota
     };
 
     // --- FUNCIONALIDAD DE WHATSAPP ---
 
     const handleSendWhatsApp = (turno) => {
-        if (!turno.phone) {
-            // Podrías mostrar un mensaje de error personalizado aquí
-            return;
-        }
+        if (!turno.phone) return;
         const cleanPhone = turno.phone.replace(/\D/g, '');
-        const message = encodeURIComponent(`¡Hola ${turno.client}! Te recordamos tu turno en Barber Pro para el día ${turno.date} a las ${turno.time} para un ${turno.service}. ¡Te esperamos!`);
+        const message = encodeURIComponent(`¡Hola ${turno.client}! Te recordamos tu turno para el día ${turno.date} a las ${turno.time} (${turno.service}). ¡Te esperamos!`);
         window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
     };
 
-    // --- PROCESAMIENTO DE NEGOCIO ---
+    // --- LÓGICA DE NEGOCIO ---
 
     const handleCompleteTurno = (turno) => {
         if (turno.status === 'completed') return;
 
-        const turnosActualizados = data.turnos.map(t => 
+        // 1. Marcar turno como completado
+        const turnosActualizados = (data.turnos || []).map(t => 
             t.id === turno.id ? { ...t, status: 'completed' } : t
         );
 
+        // 2. Crear entrada en el historial (esto alimenta Resúmenes y Estadísticas)
         const nuevoServicio = {
             id: Date.now(),
             client: turno.client,
@@ -141,6 +150,7 @@ const App = () => {
         };
         const historialActualizado = [nuevoServicio, ...(data.historial || [])];
 
+        // 3. Actualizar contador de visitas del cliente
         let clientesActualizados = [...(data.clientes || [])];
         const clienteIndex = clientesActualizados.findIndex(c => 
             c.name.toLowerCase() === turno.client.toLowerCase()
@@ -177,7 +187,7 @@ const App = () => {
         if (loading) return (
             <div className="flex flex-col items-center justify-center py-40">
                 <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-6"></div>
-                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-500 animate-pulse">Sincronizando Base de Datos</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-500 animate-pulse">Cargando base de datos...</p>
             </div>
         );
 
@@ -218,7 +228,9 @@ const App = () => {
         }
     };
 
-    const balanceTotal = ((data.historial || []).reduce((a, b) => a + Number(b.price || 0), 0) - (data.gastos || []).reduce((a, b) => a + Number(b.amount || 0), 0));
+    const totalIngresos = (data.historial || []).reduce((a, b) => a + Number(b.price || 0), 0);
+    const totalGastos = (data.gastos || []).reduce((a, b) => a + Number(b.amount || 0), 0);
+    const balanceTotal = totalIngresos - totalGastos;
 
     return (
         <div className="flex min-h-screen relative bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30">
@@ -246,12 +258,12 @@ const App = () => {
                         <div className="flex items-center gap-3 p-4 rounded-2xl bg-white/5 border border-white/5">
                             <div className="relative">
                                 <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
-                                    <Icon name="database" size={14} className="text-blue-400" />
+                                    <Icon name="database" size={14} className={saving ? "text-amber-500" : "text-blue-400"} />
                                 </div>
                                 {saving && <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-ping"></div>}
                             </div>
                             <div className="overflow-hidden">
-                                <p className="text-[10px] font-bold text-white truncate uppercase tracking-tighter">{saving ? 'Guardando...' : 'Estado Nube'}</p>
+                                <p className="text-[10px] font-bold text-white truncate uppercase tracking-tighter">{saving ? 'Guardando...' : 'GitHub DB'}</p>
                                 <p className="text-[8px] text-emerald-500 font-black uppercase mt-0.5">Sincronizado</p>
                             </div>
                         </div>
@@ -268,7 +280,7 @@ const App = () => {
                     </button>
                     
                     <div className="hidden lg:block">
-                        <h2 className="text-[10px] font-black uppercase text-blue-500 tracking-[0.5em] mb-2">Cloud Management System</h2>
+                        <h2 className="text-[10px] font-black uppercase text-blue-500 tracking-[0.5em] mb-2">Cloud Infrastructure</h2>
                         <div className="flex items-center gap-2">
                             <span className={`w-2 h-2 rounded-full ${saving ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
                             <p className="text-slate-100 font-extrabold text-lg italic tracking-tight capitalize">{activeTab}</p>
@@ -277,7 +289,7 @@ const App = () => {
                     
                     <div className="flex items-center gap-6">
                         <div className="hidden sm:flex flex-col text-right">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Balance Disponible</p>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Balance Total</p>
                             <p className={`font-black italic text-2xl ${balanceTotal >= 0 ? 'text-white' : 'text-rose-500'}`}>
                                 ${balanceTotal.toLocaleString()}
                             </p>
@@ -285,7 +297,7 @@ const App = () => {
                         <button 
                             onClick={loadFromGitHub} 
                             disabled={loading}
-                            className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer active:scale-90"
+                            className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer active:scale-95"
                         >
                             <Icon name="refresh-cw" size={20} className={`${loading ? 'animate-spin' : ''}`} />
                         </button>
@@ -298,7 +310,7 @@ const App = () => {
                 
                 <footer className="mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[9px] font-black text-slate-600 uppercase tracking-[0.3em]">
                     <p>Barber Pro Enterprise © 2024</p>
-                    <p className="text-blue-500/50">Infraestructura GitHub API v3</p>
+                    <p className="text-blue-500/50">Base de Datos Centralizada</p>
                 </footer>
             </main>
         </div>
