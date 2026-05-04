@@ -6,10 +6,10 @@ const { useState, useEffect, useCallback } = React;
 
 // --- CONFIGURACIÓN DE GITHUB ---
 // Debes completar estos datos para que la persistencia funcione
-const GITHUB_CONFIG = {
-    token: '', // Tu Personal Access Token de GitHub
-    owner: '', // Tu usuario de GitHub
-    repo: '',  // Nombre del repositorio
+const GITHUB_CONFIG = { 
+    token: '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', // Tu Personal Access Token de GitHub
+    owner: 'lautyortiz987-wq', // Tu usuario de GitHub
+    repo: 'appbarber',  // Nombre del repositorio
     path: 'database.json', // Nombre del archivo .json en el repo
     branch: 'main'
 };
