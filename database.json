@@ -2,5 +2,16 @@
   "historial": [],
   "gastos": [],
   "clientes": [],
-  "turnos": []
+  "turnos": [
+    {
+      "id": "1777883307540",
+      "client": "Diego martinez",
+      "phone": "",
+      "time": "17:00",
+      "service": "Degradé / Fade",
+      "price": 6000,
+      "date": "2026-05-01",
+      "status": "pending"
+    }
+  ]
 }
