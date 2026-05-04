@@ -1,44 +1,61 @@
 /**
- * GastosModule - Gestión de Egresos
- * Módulo para registrar gastos operativos y de insumos de la barbería.
+ * GastosModule - Gestión de Egresos Optimizado
+ * Módulo para registrar gastos con manejo de estado mejorado para evitar bloqueos.
  */
 window.GastosModule = ({ expenses = [], onAdd, onDelete }) => {
     const Icon = window.LucideIcon;
-    const [form, setForm] = React.useState({ 
+    
+    // Estado inicial para resetear fácil
+    const initialState = { 
         detail: '', 
         amount: '', 
         category: 'Insumos' 
-    });
+    };
 
-    const handleSubmit = (e) => {
-        // Prevenir el comportamiento por defecto del formulario inmediatamente
+    const [form, setForm] = React.useState(initialState);
+    const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+    const handleSubmit = async (e) => {
         if (e) {
             e.preventDefault();
             e.stopPropagation();
         }
 
+        // Evitar doble clic si ya se está enviando
+        if (isSubmitting) return;
+
         const numericAmount = parseFloat(form.amount);
         
+        // Validaciones básicas
         if (!form.detail.trim() || isNaN(numericAmount) || numericAmount <= 0) {
             return;
         }
-        
-        // Ejecutar la función de agregar pasada por props
-        if (onAdd) {
-            onAdd({
-                id: Date.now(),
-                detail: form.detail.trim(),
-                amount: numericAmount,
-                category: form.category,
-                date: new Date().toISOString()
-            });
+
+        setIsSubmitting(true);
+
+        try {
+            // Ejecutar la función de agregar pasada por props
+            if (onAdd) {
+                await onAdd({
+                    id: Date.now(),
+                    detail: form.detail.trim(),
+                    amount: numericAmount,
+                    category: form.category,
+                    date: new Date().toISOString()
+                });
+            }
+            
+            // Limpiar el formulario solo después de éxito
+            setForm(initialState);
+        } catch (error) {
+            console.error("Error al guardar gasto:", error);
+        } finally {
+            // Liberar el botón
+            setIsSubmitting(false);
         }
-        
-        // Limpiar el estado local de forma segura
-        setForm({ detail: '', amount: '', category: 'Insumos' });
     };
 
-    // Cálculo del total con validación de tipo
+    // Cálculo del total memoizado para rendimiento
     const totalSpent = React.useMemo(() => {
         return expenses.reduce((acc, curr) => {
             const val = parseFloat(curr.amount);
@@ -68,6 +85,7 @@ window.GastosModule = ({ expenses = [], onAdd, onDelete }) => {
                                 value={form.detail} 
                                 onChange={e => setForm({...form, detail: e.target.value})} 
                                 placeholder="Ej: Alquiler, Insumos, Luz..."
+                                disabled={isSubmitting}
                                 required 
                             />
                         </div>
@@ -82,6 +100,7 @@ window.GastosModule = ({ expenses = [], onAdd, onDelete }) => {
                                         className="w-full p-4 rounded-2xl mt-1 font-bold appearance-none cursor-pointer outline-none focus:ring-2 focus:ring-rose-500/50 bg-slate-950/50 border border-white/5 text-white text-sm" 
                                         value={form.category} 
                                         onChange={e => setForm({...form, category: e.target.value})}
+                                        disabled={isSubmitting}
                                     >
                                         <option>Insumos</option>
                                         <option>Servicios Públicos</option>
@@ -105,6 +124,7 @@ window.GastosModule = ({ expenses = [], onAdd, onDelete }) => {
                                     value={form.amount} 
                                     onChange={e => setForm({...form, amount: e.target.value})} 
                                     placeholder="0.00"
+                                    disabled={isSubmitting}
                                     required 
                                 />
                             </div>
@@ -112,9 +132,12 @@ window.GastosModule = ({ expenses = [], onAdd, onDelete }) => {
 
                         <button 
                             type="submit" 
-                            className="w-full py-4 bg-rose-600 hover:bg-rose-500 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition-all shadow-lg shadow-rose-900/40 active:scale-[0.98] text-white"
+                            disabled={isSubmitting}
+                            className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition-all shadow-lg text-white ${
+                                isSubmitting ? 'bg-slate-700 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-500 active:scale-[0.98] shadow-rose-900/40'
+                            }`}
                         >
-                            Guardar Egreso
+                            {isSubmitting ? 'Procesando...' : 'Guardar Egreso'}
                         </button>
                     </form>
                 </div>
