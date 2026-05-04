@@ -1,6 +1,14 @@
 {
   "historial": [
     {
+      "id": 1777883366957,
+      "client": "Papa",
+      "service": "Corte Clásico",
+      "price": 6000,
+      "date": "2026-05-04T08:29:26.957Z",
+      "isFromTurno": true
+    },
+    {
       "id": 1777883310390,
       "client": "Diego martinez",
       "service": "Degradé / Fade",
@@ -17,6 +25,13 @@
       "phone": "",
       "visits": 1,
       "lastVisit": "2026-05-04T08:28:30.391Z"
+    },
+    {
+      "id": 1777883366959,
+      "name": "Papa",
+      "phone": "",
+      "visits": 1,
+      "lastVisit": "2026-05-04T08:29:26.958Z"
     }
   ],
   "turnos": [
@@ -28,7 +43,7 @@
       "service": "Corte Clásico",
       "price": 6000,
       "date": "2026-04-30",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "1777883330715",
