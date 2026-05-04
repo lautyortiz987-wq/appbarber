@@ -1,6 +1,6 @@
 /**
  * TurnosModule - Gestión de Agenda e Ingresos
- * Versión mejorada con sincronización optimizada para la persistencia del Canvas.
+ * Versión 3.0 - Sincronizada con GitHub API y App.js
  */
 window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
     const Icon = window.LucideIcon;
@@ -59,12 +59,12 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                 status: 'pending'
             };
 
-            // onAdd envía el turno al componente App (Padre) para guardarlo en la DB
+            // Notificamos al padre (App.js) para que guarde en GitHub
             if (onAdd) {
                 await onAdd(newAppointment);
             }
             
-            // Limpiamos los campos críticos pero mantenemos la fecha para comodidad del usuario
+            // Limpiamos los campos manteniendo la fecha
             setForm({ 
                 ...initialState, 
                 date: form.date,
@@ -83,7 +83,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
 
     // Filtrado y ordenamiento de turnos para la vista actual
     const dailyAppointments = React.useMemo(() => {
-        return appointments
+        return (appointments || [])
             .filter(a => a.date === selectedDate)
             .filter(a => a.client.toLowerCase().includes(searchTerm.toLowerCase()))
             .sort((a, b) => a.time.localeCompare(b.time));
@@ -184,14 +184,13 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                         <button 
                             type="submit" 
                             disabled={isSubmitting}
-                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition-all text-white shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition-all text-white shadow-lg active:scale-95 disabled:opacity-50"
                         >
-                            {isSubmitting ? 'Procesando...' : 'Reservar Turno'}
+                            {isSubmitting ? 'Guardando en GitHub...' : 'Reservar Turno'}
                         </button>
                     </form>
                 </div>
 
-                {/* Resumen de Caja Lateral */}
                 <div className="glass-card p-6 border-emerald-500/10 bg-emerald-500/5 rounded-3xl border border-white/5">
                     <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Resumen Hoy</p>
                     <div className="flex justify-between items-end">
@@ -279,7 +278,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                         )}
                                         <button 
                                             onClick={() => onComplete && onComplete(app)}
-                                            className="p-3 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-500 hover:text-white rounded-2xl transition-all shadow-sm"
+                                            className="p-3 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-500 hover:text-white rounded-2xl transition-all"
                                             title="Marcar como Cobrado"
                                         >
                                             <Icon name="dollar-sign" size={20} />
@@ -288,11 +287,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                 )}
                                 
                                 <button 
-                                    onClick={() => {
-                                        if(window.confirm(`¿Eliminar turno de ${app.client}?`)) {
-                                            onDelete && onDelete(app.id);
-                                        }
-                                    }}
+                                    onClick={() => onDelete && onDelete(app.id)}
                                     className="p-3 text-slate-700 hover:text-rose-500 hover:bg-rose-500/10 rounded-2xl transition-all"
                                     title="Eliminar"
                                 >
@@ -304,7 +299,6 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                         <div className="glass-card p-20 text-center flex flex-col items-center justify-center border-2 border-dashed border-slate-800 bg-transparent rounded-3xl">
                             <Icon name="calendar-x" size={48} className="text-slate-800 mb-4" />
                             <p className="text-slate-600 font-black uppercase italic tracking-widest text-sm">Sin turnos agendados</p>
-                            <p className="text-slate-700 text-[10px] font-bold mt-2">Usa el formulario para empezar a recibir clientes.</p>
                         </div>
                     )}
                 </div>
