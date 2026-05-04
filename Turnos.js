@@ -1,6 +1,6 @@
 /**
  * TurnosModule - Gestión de Agenda e Ingresos
- * Versión mejorada basada en tu diseño anterior de alto rendimiento.
+ * Versión mejorada con sincronización optimizada para la persistencia del Canvas.
  */
 window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
     const Icon = window.LucideIcon;
@@ -19,12 +19,12 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
     const [form, setForm] = React.useState(initialState);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-    // Sincronizar la fecha del formulario si cambia la selección global
+    // Sincronizar la fecha del formulario si cambia la selección global del calendario
     React.useEffect(() => {
         setForm(prev => ({ ...prev, date: selectedDate }));
     }, [selectedDate]);
 
-    // Estadísticas para el panel lateral
+    // Estadísticas para el panel lateral (Caja del día)
     const stats = React.useMemo(() => {
         const dayApps = appointments.filter(a => a.date === selectedDate);
         return {
@@ -42,8 +42,9 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
             e.stopPropagation();
         }
         
+        // Validaciones de seguridad
         if (isSubmitting) return;
-        if (!form.client.trim() || !form.time || !form.price) return;
+        if (!form.client.trim() || !form.time || !form.price || !form.date) return;
 
         setIsSubmitting(true);
         try {
@@ -58,11 +59,12 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                 status: 'pending'
             };
 
+            // onAdd envía el turno al componente App (Padre) para guardarlo en la DB
             if (onAdd) {
                 await onAdd(newAppointment);
             }
             
-            // Reset manteniendo la fecha actual
+            // Limpiamos los campos críticos pero mantenemos la fecha para comodidad del usuario
             setForm({ 
                 ...initialState, 
                 date: form.date,
@@ -71,6 +73,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                 time: '',
                 price: ''
             });
+            
         } catch (error) {
             console.error("Error al agendar:", error);
         } finally {
@@ -78,10 +81,13 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
         }
     };
 
-    const dailyAppointments = appointments
-        .filter(a => a.date === selectedDate)
-        .filter(a => a.client.toLowerCase().includes(searchTerm.toLowerCase()))
-        .sort((a, b) => a.time.localeCompare(b.time));
+    // Filtrado y ordenamiento de turnos para la vista actual
+    const dailyAppointments = React.useMemo(() => {
+        return appointments
+            .filter(a => a.date === selectedDate)
+            .filter(a => a.client.toLowerCase().includes(searchTerm.toLowerCase()))
+            .sort((a, b) => a.time.localeCompare(b.time));
+    }, [appointments, selectedDate, searchTerm]);
 
     const sendWhatsApp = (app) => {
         const message = `Hola ${app.client}! Te recordamos tu turno en la barbería para el día ${app.date} a las ${app.time}hs. ¡Te esperamos!`;
@@ -92,7 +98,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 fade-in">
-            {/* PANEL IZQUIERDO: FORMULARIO (Basado en tu versión anterior) */}
+            {/* PANEL IZQUIERDO: FORMULARIO */}
             <div className="lg:col-span-1 space-y-6">
                 <div className="glass-card p-8 border-blue-500/10 shadow-xl shadow-blue-900/10 bg-slate-900/40 backdrop-blur-md rounded-3xl border border-white/5">
                     <div className="flex items-center gap-3 mb-6">
@@ -113,12 +119,13 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                     setForm({...form, date: e.target.value});
                                     setSelectedDate(e.target.value);
                                 }}
+                                required
                             />
                         </div>
                         <div>
                             <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Cliente</label>
                             <input 
-                                className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white"
+                                className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white focus:border-blue-500/50"
                                 placeholder="Nombre del cliente"
                                 value={form.client}
                                 onChange={e => setForm({...form, client: e.target.value})}
@@ -129,7 +136,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                         <div>
                             <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">WhatsApp</label>
                             <input 
-                                className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white"
+                                className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white focus:border-blue-500/50"
                                 placeholder="Ej: 54911..."
                                 value={form.phone}
                                 onChange={e => setForm({...form, phone: e.target.value})}
@@ -141,7 +148,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                 <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Hora</label>
                                 <input 
                                     type="time" 
-                                    className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white"
+                                    className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white focus:border-blue-500/50"
                                     value={form.time}
                                     onChange={e => setForm({...form, time: e.target.value})}
                                     required
@@ -151,7 +158,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                 <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Precio</label>
                                 <input 
                                     type="number" 
-                                    className="w-full p-4 rounded-2xl mt-1 font-black outline-none bg-slate-950/50 border border-white/5 text-emerald-400"
+                                    className="w-full p-4 rounded-2xl mt-1 font-black outline-none bg-slate-950/50 border border-white/5 text-emerald-400 focus:border-emerald-500/50"
                                     placeholder="0"
                                     value={form.price}
                                     onChange={e => setForm({...form, price: e.target.value})}
@@ -163,29 +170,29 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                         <div>
                             <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Servicio</label>
                             <select 
-                                className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white text-sm"
+                                className="w-full p-4 rounded-2xl mt-1 font-bold outline-none bg-slate-950/50 border border-white/5 text-white text-sm cursor-pointer"
                                 value={form.service}
                                 onChange={e => setForm({...form, service: e.target.value})}
                             >
-                                <option>Corte Clásico</option>
-                                <option>Degradé / Fade</option>
-                                <option>Barba / Perfilado</option>
-                                <option>Combo Full</option>
+                                <option value="Corte Clásico">Corte Clásico</option>
+                                <option value="Degradé / Fade">Degradé / Fade</option>
+                                <option value="Barba / Perfilado">Barba / Perfilado</option>
+                                <option value="Combo Full">Combo Full</option>
                             </select>
                         </div>
 
                         <button 
                             type="submit" 
                             disabled={isSubmitting}
-                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition-all text-white shadow-lg active:scale-95 disabled:opacity-50"
+                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition-all text-white shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {isSubmitting ? 'Guardando...' : 'Reservar Turno'}
+                            {isSubmitting ? 'Procesando...' : 'Reservar Turno'}
                         </button>
                     </form>
                 </div>
 
-                {/* Caja del día */}
-                <div className="glass-card p-6 border-emerald-500/10 bg-emerald-500/5 rounded-3xl">
+                {/* Resumen de Caja Lateral */}
+                <div className="glass-card p-6 border-emerald-500/10 bg-emerald-500/5 rounded-3xl border border-white/5">
                     <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Resumen Hoy</p>
                     <div className="flex justify-between items-end">
                         <div>
@@ -199,7 +206,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                 </div>
             </div>
 
-            {/* PANEL DERECHO: LISTADO (Estilo tu versión anterior con mejoras) */}
+            {/* PANEL DERECHO: AGENDA */}
             <div className="lg:col-span-2 space-y-6">
                 <div className="flex justify-between items-center px-2">
                     <div>
@@ -214,12 +221,12 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                             <input 
                                 type="text"
                                 placeholder="Buscar..."
-                                className="bg-slate-900/50 border border-white/5 rounded-xl py-1.5 pl-8 pr-4 text-xs font-bold text-white outline-none"
+                                className="bg-slate-900/50 border border-white/5 rounded-xl py-1.5 pl-8 pr-4 text-xs font-bold text-white outline-none focus:border-blue-500/30"
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        <span className="text-[10px] font-black text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full uppercase">
+                        <span className="text-[10px] font-black text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full uppercase border border-blue-500/20">
                             {dailyAppointments.length} Turnos
                         </span>
                     </div>
@@ -231,7 +238,7 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                              className={`glass-card p-6 flex justify-between items-center group transition-all border rounded-3xl ${
                                 app.status === 'completed' 
                                 ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70' 
-                                : 'bg-slate-900/30 border-white/5 hover:border-blue-500/30'
+                                : 'bg-slate-900/30 border-white/5 hover:border-blue-500/30 shadow-md shadow-black/20'
                              }`}>
                             <div className="flex items-center gap-6">
                                 <div className="text-center min-w-[70px]">
@@ -251,7 +258,9 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                             <Icon name="scissors" size={12} className="text-blue-500" />
                                             {app.service}
                                         </p>
-                                        <span className="text-xs font-black text-emerald-500">${app.price}</span>
+                                        <span className="text-xs font-black text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded">
+                                            ${parseFloat(app.price).toLocaleString('es-AR')}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -263,14 +272,15 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                             <button 
                                                 onClick={() => sendWhatsApp(app)}
                                                 className="p-3 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-2xl transition-all"
+                                                title="Enviar Recordatorio"
                                             >
                                                 <Icon name="message-circle" size={20} />
                                             </button>
                                         )}
                                         <button 
                                             onClick={() => onComplete && onComplete(app)}
-                                            className="p-3 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-500 hover:text-white rounded-2xl transition-all"
-                                            title="Cobrar"
+                                            className="p-3 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-500 hover:text-white rounded-2xl transition-all shadow-sm"
+                                            title="Marcar como Cobrado"
                                         >
                                             <Icon name="dollar-sign" size={20} />
                                         </button>
@@ -278,8 +288,13 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                                 )}
                                 
                                 <button 
-                                    onClick={() => onDelete && onDelete(app.id)}
+                                    onClick={() => {
+                                        if(window.confirm(`¿Eliminar turno de ${app.client}?`)) {
+                                            onDelete && onDelete(app.id);
+                                        }
+                                    }}
                                     className="p-3 text-slate-700 hover:text-rose-500 hover:bg-rose-500/10 rounded-2xl transition-all"
+                                    title="Eliminar"
                                 >
                                     <Icon name="trash-2" size={20} />
                                 </button>
@@ -288,7 +303,8 @@ window.TurnosModule = ({ appointments = [], onAdd, onDelete, onComplete }) => {
                     )) : (
                         <div className="glass-card p-20 text-center flex flex-col items-center justify-center border-2 border-dashed border-slate-800 bg-transparent rounded-3xl">
                             <Icon name="calendar-x" size={48} className="text-slate-800 mb-4" />
-                            <p className="text-slate-600 font-black uppercase italic tracking-widest text-sm">Sin turnos para hoy</p>
+                            <p className="text-slate-600 font-black uppercase italic tracking-widest text-sm">Sin turnos agendados</p>
+                            <p className="text-slate-700 text-[10px] font-bold mt-2">Usa el formulario para empezar a recibir clientes.</p>
                         </div>
                     )}
                 </div>
