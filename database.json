@@ -42,26 +42,5 @@
       "lastVisit": "2026-05-04T04:18:16.569Z"
     }
   ],
-  "turnos": [
-    {
-      "id": "1777868276400",
-      "client": "222",
-      "phone": "222",
-      "time": "01:19",
-      "service": "Corte Clásico",
-      "price": 2222222222,
-      "date": "2026-05-04",
-      "status": "completed"
-    },
-    {
-      "id": "1777868268419",
-      "client": "2222",
-      "phone": "22222",
-      "time": "01:18",
-      "service": "Corte Clásico",
-      "price": 2222,
-      "date": "2026-05-04",
-      "status": "completed"
-    }
-  ]
+  "turnos": []
 }
