@@ -1,6 +1,14 @@
 {
   "historial": [
     {
+      "id": 1777883376257,
+      "client": "Isa primo",
+      "service": "Degradé / Fade",
+      "price": 5000,
+      "date": "2026-05-04T08:29:36.257Z",
+      "isFromTurno": true
+    },
+    {
       "id": 1777883366957,
       "client": "Papa",
       "service": "Corte Clásico",
@@ -32,6 +40,13 @@
       "phone": "",
       "visits": 1,
       "lastVisit": "2026-05-04T08:29:26.958Z"
+    },
+    {
+      "id": 1777883376258,
+      "name": "Isa primo",
+      "phone": "",
+      "visits": 1,
+      "lastVisit": "2026-05-04T08:29:36.257Z"
     }
   ],
   "turnos": [
@@ -53,7 +68,7 @@
       "service": "Degradé / Fade",
       "price": 5000,
       "date": "2026-05-01",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "1777883307540",
