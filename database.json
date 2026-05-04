@@ -35,5 +35,16 @@
       "lastVisit": "2026-05-04T04:33:16.981Z"
     }
   ],
-  "turnos": []
+  "turnos": [
+    {
+      "id": "1777869712939",
+      "client": "Ari",
+      "phone": "342 434-0593",
+      "time": "13:41",
+      "service": "Degradé / Fade",
+      "price": 6000,
+      "date": "2026-05-04",
+      "status": "pending"
+    }
+  ]
 }
