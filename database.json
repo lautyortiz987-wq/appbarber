@@ -26,14 +26,6 @@
     }
   ],
   "gastos": [],
-  "clientes": [
-    {
-      "id": 1777869196982,
-      "name": "Ari",
-      "phone": "342 434-0593",
-      "visits": 1,
-      "lastVisit": "2026-05-04T04:33:16.981Z"
-    }
-  ],
+  "clientes": [],
   "turnos": []
 }
