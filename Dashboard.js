@@ -53,23 +53,26 @@ window.DashboardModule = ({ services, expenses }) => {
         setSelectedWeek(0);
     };
 
-    // Parsear fecha ISO compensando timezone local
-    // "2026-05-04T01:04:02.368Z" en UTC-3 = 4 de mayo local
-    const parseLocalDate = (dateStr) => {
-        if (!dateStr) return null;
-        try {
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return null;
-            // Usar métodos locales del browser (ya compensan timezone)
-            return {
-                y: d.getFullYear(),
-                m: d.getMonth(),   // 0-indexed
-                d: d.getDate()
-            };
-        } catch(e) {
-            return null;
+const parseLocalDate = (dateStr) => {
+    if (!dateStr) return null;
+    try {
+        // Si viene solo como "YYYY-MM-DD", parsear manualmente para evitar offset UTC
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            return { y, m: m - 1, d }; // m es 0-indexed
         }
-    };
+        // Si viene con hora (ISO completo), usar métodos locales
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return null;
+        return {
+            y: d.getFullYear(),
+            m: d.getMonth(),
+            d: d.getDate()
+        };
+    } catch(e) {
+        return null;
+    }
+};
 
     const stats = React.useMemo(() => {
         const inRange = (dateStr) => {
