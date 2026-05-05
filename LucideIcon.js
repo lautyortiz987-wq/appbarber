@@ -1,10 +1,3 @@
-setTimeout(() => {
-    const keys = Object.keys(window.lucide || {});
-    const ejemplo = window.lucide[keys[0]];
-    console.log('[Lucide] Primera key:', keys[0]);
-    console.log('[Lucide] Estructura:', JSON.stringify(ejemplo));
-}, 500);
-
 window.LucideIcon = ({ name, size = 16, className = '' }) => {
     const pascal = name
         .split('-')
@@ -13,9 +6,17 @@ window.LucideIcon = ({ name, size = 16, className = '' }) => {
 
     const iconData = window.lucide && window.lucide[pascal];
 
-    if (!iconData) return React.createElement('span', {
-        style: { display: 'inline-block', width: size, height: size }
-    });
+    if (!iconData) {
+        // DEBUG temporal - ver qué hay en window.lucide
+        if (name === 'chevron-left') {
+            const keys = Object.keys(window.lucide || {});
+            console.log('[Lucide] Keys ejemplo:', keys.slice(0, 5));
+            console.log('[Lucide] Estructura de', keys[0], ':', JSON.stringify(window.lucide[keys[0]]));
+        }
+        return React.createElement('span', {
+            style: { display: 'inline-block', width: size, height: size }
+        });
+    }
 
     const [, , children] = iconData;
 
