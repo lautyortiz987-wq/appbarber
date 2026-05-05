@@ -1,40 +1,75 @@
 /**
- * DashboardModule - Resúmenes
- * Este componente muestra las estadísticas clave del día y el balance general.
+ * DashboardModule - Resúmenes con filtro Día / Semana / Mes
  */
 window.DashboardModule = ({ services, expenses }) => {
     const Icon = window.LucideIcon;
+    const [period, setPeriod] = React.useState('day');
 
-    // Cálculo de estadísticas en tiempo real
     const stats = React.useMemo(() => {
-        const now = new Date().toDateString();
-        
-        // Filtrar servicios y gastos del día de hoy
-        const todayS = services.filter(s => new Date(s.date).toDateString() === now);
-        const todayE = expenses.filter(e => new Date(e.date).toDateString() === now);
-        
-        const income = todayS.reduce((acc, curr) => acc + Number(curr.price || 0), 0);
-        const spend = todayE.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
-        
-        return { 
-            income, 
-            spend, 
-            net: income - spend, 
-            count: todayS.length,
-            growth: todayS.length > 0 ? 100 : 0 // Placeholder para lógica de crecimiento
+        const now = new Date();
+
+        const inPeriod = (dateStr) => {
+            const d = new Date(dateStr);
+            if (period === 'day') {
+                return d.toDateString() === now.toDateString();
+            }
+            if (period === 'week') {
+                const startOfWeek = new Date(now);
+                startOfWeek.setDate(now.getDate() - now.getDay());
+                startOfWeek.setHours(0, 0, 0, 0);
+                return d >= startOfWeek;
+            }
+            if (period === 'month') {
+                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            }
+            return false;
         };
-    }, [services, expenses]);
+
+        const filteredS = services.filter(s => inPeriod(s.date));
+        const filteredE = expenses.filter(e => inPeriod(e.date));
+
+        const income = filteredS.reduce((acc, curr) => acc + Number(curr.price || 0), 0);
+        const spend = filteredE.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+
+        return {
+            income,
+            spend,
+            net: income - spend,
+            count: filteredS.length,
+            recentServices: filteredS.slice(0, 5),
+        };
+    }, [services, expenses, period]);
+
+    const periodLabel = { day: 'hoy', week: 'esta semana', month: 'este mes' }[period];
+
+    const PeriodBtn = ({ value, label }) => (
+        <button
+            onClick={() => setPeriod(value)}
+            className={`px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] rounded-xl transition-all ${
+                period === value
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                    : 'bg-white/5 text-slate-500 hover:text-slate-300 hover:bg-white/10 border border-white/5'
+            }`}
+        >
+            {label}
+        </button>
+    );
 
     return (
         <div className="space-y-8 fade-in">
-            {/* Header del Dashboard */}
+            {/* Header con selector de período */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h3 className="text-2xl font-extrabold text-white tracking-tight">Vista General</h3>
-                    <p className="text-slate-400 text-sm font-medium">Esto es lo que está pasando en tu barbería hoy.</p>
+                    <p className="text-slate-400 text-sm font-medium">
+                        Mostrando resultados de <span className="text-blue-400 font-bold">{periodLabel}</span>
+                    </p>
                 </div>
-                <div className="flex gap-2">
-                    <div className="px-4 py-2 glass-card flex items-center gap-2 text-xs font-bold text-blue-400">
+                <div className="flex items-center gap-2">
+                    <PeriodBtn value="day" label="Hoy" />
+                    <PeriodBtn value="week" label="Semana" />
+                    <PeriodBtn value="month" label="Mes" />
+                    <div className="ml-2 px-4 py-2 glass-card flex items-center gap-2 text-xs font-bold text-blue-400">
                         <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
                         En Vivo
                     </div>
@@ -45,25 +80,28 @@ window.DashboardModule = ({ services, expenses }) => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 glass-card p-8 bg-gradient-to-br from-blue-600/20 via-indigo-900/40 to-slate-900/50 relative overflow-hidden flex flex-col justify-center min-h-[240px] border-blue-500/20 shadow-2xl shadow-blue-900/20">
                     <div className="relative z-10">
-                        <p className="text-blue-400 font-black uppercase tracking-[0.2em] text-[10px] mb-3">Ganancia Neta Disponible</p>
-                        <h2 className="text-7xl font-extrabold tracking-tighter text-white mb-4">
-                            ${stats.net.toLocaleString()}
+                        <p className="text-blue-400 font-black uppercase tracking-[0.2em] text-[10px] mb-3">
+                            Ganancia Neta — {periodLabel}
+                        </p>
+                        <h2 className={`text-7xl font-extrabold tracking-tighter mb-4 ${stats.net >= 0 ? 'text-white' : 'text-rose-400'}`}>
+                            ${stats.net.toLocaleString('es-AR')}
                         </h2>
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-                                <Icon name="trending-up" size={14} className="text-emerald-400" />
-                                <span className="text-[10px] font-bold text-emerald-400 uppercase">Excelente ritmo</span>
+                                <Icon name={stats.net >= 0 ? 'trending-up' : 'trending-down'} size={14} className={stats.net >= 0 ? 'text-emerald-400' : 'text-rose-400'} />
+                                <span className={`text-[10px] font-bold uppercase ${stats.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {stats.net >= 0 ? 'Positivo' : 'Negativo'}
+                                </span>
                             </div>
                             <p className="text-slate-400 text-xs font-semibold">
-                                Basado en <span className="text-white">{stats.count}</span> servicios hoy
+                                Basado en <span className="text-white">{stats.count}</span> {stats.count === 1 ? 'servicio' : 'servicios'} {periodLabel}
                             </p>
                         </div>
                     </div>
-                    {/* Icono decorativo de fondo */}
                     <Icon name="bar-chart-3" size={180} className="absolute -right-10 -bottom-10 opacity-5 text-blue-400 transform -rotate-12" />
                 </div>
-                
-                {/* Mini Stats Lateral */}
+
+                {/* Mini Stats */}
                 <div className="grid grid-cols-1 gap-4">
                     <div className="glass-card p-6 flex flex-col justify-between border-emerald-500/10">
                         <div className="flex justify-between items-start">
@@ -73,8 +111,8 @@ window.DashboardModule = ({ services, expenses }) => {
                             <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded">INGRESOS</span>
                         </div>
                         <div className="mt-4">
-                            <p className="text-3xl font-black text-white">${stats.income.toLocaleString()}</p>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">Total de servicios</p>
+                            <p className="text-3xl font-black text-white">${stats.income.toLocaleString('es-AR')}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">{stats.count} servicios {periodLabel}</p>
                         </div>
                     </div>
 
@@ -86,49 +124,110 @@ window.DashboardModule = ({ services, expenses }) => {
                             <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-2 py-1 rounded">GASTOS</span>
                         </div>
                         <div className="mt-4">
-                            <p className="text-3xl font-black text-white">${stats.spend.toLocaleString()}</p>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">Insumos y fijos</p>
+                            <p className="text-3xl font-black text-white">${stats.spend.toLocaleString('es-AR')}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">Insumos y fijos {periodLabel}</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Sección Inferior - Actividad Reciente */}
+            {/* Sección Inferior */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="glass-card p-6">
                     <div className="flex justify-between items-center mb-6">
                         <h4 className="font-bold text-slate-200 flex items-center gap-2 italic">
                             <Icon name="history" size={18} className="text-blue-500" />
-                            Últimos Cortes
+                            Últimos Cortes — {periodLabel}
                         </h4>
-                        <button className="text-[10px] font-black text-blue-500 uppercase tracking-widest hover:text-blue-400 transition-colors">Ver Todo</button>
                     </div>
                     <div className="space-y-4">
-                        {services.length > 0 ? services.slice(0, 4).map(s => (
+                        {stats.recentServices.length > 0 ? stats.recentServices.map(s => (
                             <div key={s.id} className="flex justify-between items-center p-4 bg-white/[0.02] hover:bg-white/[0.05] rounded-2xl border border-white/[0.03] transition-all">
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-xs">
-                                        {s.client.charAt(0)}
+                                        {s.client ? s.client.charAt(0).toUpperCase() : '?'}
                                     </div>
                                     <div>
                                         <p className="font-bold text-sm text-slate-100">{s.client}</p>
                                         <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">{s.service}</p>
                                     </div>
                                 </div>
-                                <p className="font-black text-emerald-400">+${Number(s.price).toLocaleString()}</p>
+                                <p className="font-black text-emerald-400">+${Number(s.price).toLocaleString('es-AR')}</p>
                             </div>
                         )) : (
-                            <div className="text-center py-8 text-slate-600 text-xs font-bold uppercase italic">No hay actividad reciente</div>
+                            <div className="text-center py-10 flex flex-col items-center gap-3">
+                                <Icon name="scissors" size={32} className="text-slate-800" />
+                                <p className="text-slate-600 text-xs font-bold uppercase italic">Sin actividad {periodLabel}</p>
+                            </div>
                         )}
                     </div>
                 </div>
 
-                <div className="glass-card p-8 border-dashed border-slate-700 bg-transparent flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 rounded-3xl bg-blue-600/10 flex items-center justify-center mb-4 text-blue-500">
-                        <Icon name="pie-chart" size={32} />
-                    </div>
-                    <h5 className="text-slate-200 font-extrabold uppercase tracking-tight">Análisis de Rendimiento</h5>
-                    <p className="text-slate-500 text-sm mt-2 max-w-[250px]">Pronto podrás ver gráficos detallados de tus servicios más pedidos y horas pico.</p>
+                {/* Resumen visual del período */}
+                <div className="glass-card p-8 flex flex-col justify-between border-white/5">
+                    <h4 className="font-bold text-slate-200 flex items-center gap-2 italic mb-6">
+                        <Icon name="pie-chart" size={18} className="text-blue-500" />
+                        Resumen del período
+                    </h4>
+
+                    {stats.income > 0 || stats.spend > 0 ? (
+                        <div className="space-y-5 flex-1 flex flex-col justify-center">
+                            {/* Barra de ingresos */}
+                            <div>
+                                <div className="flex justify-between text-[10px] font-black uppercase mb-2">
+                                    <span className="text-emerald-400">Ingresos</span>
+                                    <span className="text-white">${stats.income.toLocaleString('es-AR')}</span>
+                                </div>
+                                <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500 rounded-full transition-all duration-700"
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Barra de gastos relativa a ingresos */}
+                            <div>
+                                <div className="flex justify-between text-[10px] font-black uppercase mb-2">
+                                    <span className="text-rose-400">Gastos</span>
+                                    <span className="text-white">${stats.spend.toLocaleString('es-AR')}</span>
+                                </div>
+                                <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
+                                    <div className="h-full bg-rose-500 rounded-full transition-all duration-700"
+                                        style={{ width: `${Math.min((stats.spend / (stats.income || 1)) * 100, 100)}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Barra de ganancia neta */}
+                            <div>
+                                <div className="flex justify-between text-[10px] font-black uppercase mb-2">
+                                    <span className="text-blue-400">Ganancia neta</span>
+                                    <span className={stats.net >= 0 ? 'text-blue-400' : 'text-rose-400'}>
+                                        ${stats.net.toLocaleString('es-AR')}
+                                    </span>
+                                </div>
+                                <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full transition-all duration-700 ${stats.net >= 0 ? 'bg-blue-500' : 'bg-rose-600'}`}
+                                        style={{ width: `${Math.min(Math.abs(stats.net / (stats.income || 1)) * 100, 100)}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
+                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Margen</p>
+                                <p className={`text-lg font-black italic ${stats.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {stats.income > 0 ? `${Math.round((stats.net / stats.income) * 100)}%` : '—'}
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+                            <Icon name="bar-chart-2" size={40} className="text-slate-800" />
+                            <p className="text-slate-600 text-xs font-bold uppercase italic text-center">
+                                Sin datos para {periodLabel}
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
