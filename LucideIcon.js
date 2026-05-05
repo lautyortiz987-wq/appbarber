@@ -71,4 +71,3 @@ return React.createElement('svg', {
         strokeLinejoin: 'round',
         className: className
     }, ...children);
-};
