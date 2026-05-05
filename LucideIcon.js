@@ -1,3 +1,10 @@
+setTimeout(() => {
+    const keys = Object.keys(window.lucide || {});
+    const ejemplo = window.lucide[keys[0]];
+    console.log('[Lucide] Primera key:', keys[0]);
+    console.log('[Lucide] Estructura:', JSON.stringify(ejemplo));
+}, 500);
+
 window.LucideIcon = ({ name, size = 16, className = '' }) => {
     const pascal = name
         .split('-')
