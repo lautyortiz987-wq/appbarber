@@ -1,5 +1,5 @@
 window.LucideIcon = ({ name, size = 16, className = '' }) => {
-    const icons = {
+        const icons = {
         'chevron-left':    [['path', {d:'M15 18l-6-6 6-6'}]],
         'chevron-right':   [['path', {d:'M9 18l6-6-6-6'}]],
         'chevron-down':    [['path', {d:'M6 9l6 6 6-6'}]],
@@ -37,11 +37,13 @@ window.LucideIcon = ({ name, size = 16, className = '' }) => {
         'home':            [['path',{d:'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'}],['polyline',{points:'9 22 9 12 15 12 15 22'}]],
         'git-branch':      [['line',{x1:'6',y1:'3',x2:'6',y2:'15'}],['circle',{cx:'18',cy:'6',r:'3'}],['circle',{cx:'6',cy:'18',r:'3'}],['path',{d:'M18 9a9 9 0 0 1-9 9'}]],
     };
+}
+
 
     const shapes = icons[name];
 
     if (!shapes) {
-return React.createElement('svg', {
+        return React.createElement('svg', {
         xmlns: 'http://www.w3.org/2000/svg',
         width: size,
         height: size,
@@ -70,4 +72,5 @@ return React.createElement('svg', {
         strokeLinecap: 'round',
         strokeLinejoin: 'round',
         className: className
-    }, ...children);
+    }, ...children); 
+    }
