@@ -1,150 +1,270 @@
 /**
- * DashboardModule - Resúmenes con filtro Día / Semana / Mes
+ * DashboardModule - Resúmenes con navegación Mes > Semana > Día
  */
 window.DashboardModule = ({ services, expenses }) => {
     const Icon = window.LucideIcon;
-    const [period, setPeriod] = React.useState('day');
 
+    const now = new Date();
+
+    const [viewMode, setViewMode] = React.useState('day');
+    const [selectedMonth, setSelectedMonth] = React.useState(now.getMonth());
+    const [selectedYear, setSelectedYear] = React.useState(now.getFullYear());
+    const [selectedDay, setSelectedDay] = React.useState(now.getDate());
+    const [selectedWeek, setSelectedWeek] = React.useState(0);
+
+    const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+    // Semanas del mes seleccionado
+    const weeksInMonth = React.useMemo(() => {
+        const weeks = [];
+        const firstDay = new Date(selectedYear, selectedMonth, 1);
+        const lastDay = new Date(selectedYear, selectedMonth + 1, 0);
+        let cursor = new Date(firstDay);
+        let weekNum = 1;
+
+        while (cursor <= lastDay) {
+            const start = new Date(cursor);
+            const end = new Date(cursor);
+            // Fin de semana = domingo o fin de mes
+            const daysUntilSunday = 7 - (cursor.getDay() || 7);
+            end.setDate(end.getDate() + daysUntilSunday);
+            if (end > lastDay) end.setTime(lastDay.getTime());
+
+            weeks.push({
+                num: weekNum++,
+                start: new Date(start),
+                end: new Date(end),
+                label: `${start.getDate()}/${start.getMonth()+1} — ${end.getDate()}/${end.getMonth()+1}`
+            });
+
+            cursor.setDate(end.getDate() + 1);
+        }
+        return weeks;
+    }, [selectedMonth, selectedYear]);
+
+    // Reset semana y día al cambiar mes
+    React.useEffect(() => {
+        setSelectedWeek(0);
+        setSelectedDay(1);
+    }, [selectedMonth, selectedYear]);
+
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+
+    // Stats filtradas
     const stats = React.useMemo(() => {
-        const now = new Date();
-
-        const inPeriod = (dateStr) => {
+        const inRange = (dateStr) => {
+            if (!dateStr) return false;
             const d = new Date(dateStr);
-            if (period === 'day') {
-                return d.toDateString() === now.toDateString();
+
+            if (viewMode === 'month') {
+                return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
             }
-            if (period === 'week') {
-                const startOfWeek = new Date(now);
-                startOfWeek.setDate(now.getDate() - now.getDay());
-                startOfWeek.setHours(0, 0, 0, 0);
-                return d >= startOfWeek;
+            if (viewMode === 'week') {
+                const week = weeksInMonth[selectedWeek];
+                if (!week) return false;
+                const start = new Date(week.start); start.setHours(0,0,0,0);
+                const end = new Date(week.end); end.setHours(23,59,59,999);
+                return d >= start && d <= end;
             }
-            if (period === 'month') {
-                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            if (viewMode === 'day') {
+                const target = new Date(selectedYear, selectedMonth, selectedDay);
+                return (
+                    d.getFullYear() === target.getFullYear() &&
+                    d.getMonth() === target.getMonth() &&
+                    d.getDate() === target.getDate()
+                );
             }
             return false;
         };
 
-        const filteredS = services.filter(s => inPeriod(s.date));
-        const filteredE = expenses.filter(e => inPeriod(e.date));
+        const filteredS = services.filter(s => inRange(s.date));
+        const filteredE = expenses.filter(e => inRange(e.date));
 
-        const income = filteredS.reduce((acc, curr) => acc + Number(curr.price || 0), 0);
-        const spend = filteredE.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+        const income = filteredS.reduce((acc, s) => acc + Number(s.price || 0), 0);
+        const spend = filteredE.reduce((acc, e) => acc + Number(e.amount || 0), 0);
+
+        const serviceCount = {};
+        filteredS.forEach(s => { serviceCount[s.service] = (serviceCount[s.service] || 0) + 1; });
+        const topService = Object.entries(serviceCount).sort((a,b) => b[1]-a[1])[0];
 
         return {
-            income,
-            spend,
+            income, spend,
             net: income - spend,
             count: filteredS.length,
-            recentServices: filteredS.slice(0, 5),
+            expenseCount: filteredE.length,
+            avgTicket: filteredS.length > 0 ? Math.round(income / filteredS.length) : 0,
+            recentServices: [...filteredS].reverse().slice(0, 5),
+            topService: topService ? topService[0] : null,
+            margin: income > 0 ? Math.round(((income - spend) / income) * 100) : 0
         };
-    }, [services, expenses, period]);
+    }, [services, expenses, viewMode, selectedMonth, selectedYear, selectedDay, selectedWeek, weeksInMonth]);
 
-    const periodLabel = { day: 'hoy', week: 'esta semana', month: 'este mes' }[period];
+    const periodLabel =
+        viewMode === 'day' ? `${selectedDay} de ${MONTHS[selectedMonth]} ${selectedYear}` :
+        viewMode === 'week' && weeksInMonth[selectedWeek] ? `Semana ${selectedWeek + 1} · ${MONTHS[selectedMonth]} ${selectedYear}` :
+        `${MONTHS[selectedMonth]} ${selectedYear}`;
 
-    const PeriodBtn = ({ value, label }) => (
-        <button
-            onClick={() => setPeriod(value)}
-            className={`px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] rounded-xl transition-all ${
-                period === value
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                    : 'bg-white/5 text-slate-500 hover:text-slate-300 hover:bg-white/10 border border-white/5'
-            }`}
-        >
-            {label}
-        </button>
-    );
+    const prevMonth = () => {
+        if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(y => y - 1); }
+        else setSelectedMonth(m => m - 1);
+    };
+    const nextMonth = () => {
+        if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(y => y + 1); }
+        else setSelectedMonth(m => m + 1);
+    };
 
     return (
-        <div className="space-y-8 fade-in">
-            {/* Header con selector de período */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h3 className="text-2xl font-extrabold text-white tracking-tight">Vista General</h3>
-                    <p className="text-slate-400 text-sm font-medium">
-                        Mostrando resultados de <span className="text-blue-400 font-bold">{periodLabel}</span>
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <PeriodBtn value="day" label="Hoy" />
-                    <PeriodBtn value="week" label="Semana" />
-                    <PeriodBtn value="month" label="Mes" />
-                    <div className="ml-2 px-4 py-2 glass-card flex items-center gap-2 text-xs font-bold text-blue-400">
-                        <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-                        En Vivo
+        <div className="space-y-6 fade-in">
+
+            {/* ── SELECTOR ── */}
+            <div className="glass-card p-5 border-white/5 space-y-4">
+
+                {/* Fila 1: Mes + modos */}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                        <button onClick={prevMonth} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all">
+                            <Icon name="chevron-left" size={16} />
+                        </button>
+                        <div className="px-4 py-2 bg-blue-600/20 border border-blue-500/20 rounded-xl min-w-[160px] text-center">
+                            <span className="text-sm font-black text-blue-300 uppercase tracking-wide">
+                                {MONTHS[selectedMonth]} {selectedYear}
+                            </span>
+                        </div>
+                        <button onClick={nextMonth} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all">
+                            <Icon name="chevron-right" size={16} />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
+                        {[['day','Día'],['week','Semana'],['month','Mes']].map(([val, lbl]) => (
+                            <button
+                                key={val}
+                                onClick={() => setViewMode(val)}
+                                className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                                    viewMode === val
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                                        : 'text-slate-500 hover:text-slate-300'
+                                }`}
+                            >
+                                {lbl}
+                            </button>
+                        ))}
                     </div>
                 </div>
+
+                {/* Fila 2: Días del mes */}
+                {viewMode === 'day' && (
+                    <div className="flex gap-1.5 flex-wrap">
+                        {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
+                            <button
+                                key={d}
+                                onClick={() => setSelectedDay(d)}
+                                className={`w-8 h-8 rounded-lg text-[11px] font-black transition-all ${
+                                    selectedDay === d
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                                        : 'bg-white/5 text-slate-500 hover:bg-white/10 hover:text-white'
+                                }`}
+                            >
+                                {d}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* Fila 2: Semanas del mes */}
+                {viewMode === 'week' && (
+                    <div className="flex gap-2 flex-wrap">
+                        {weeksInMonth.map((w, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setSelectedWeek(i)}
+                                className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${
+                                    selectedWeek === i
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                                        : 'bg-white/5 text-slate-500 hover:bg-white/10 hover:text-white border border-white/5'
+                                }`}
+                            >
+                                Sem {i + 1} · {w.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
-            {/* Tarjeta de Balance Principal */}
+            {/* ── BALANCE PRINCIPAL ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 glass-card p-8 bg-gradient-to-br from-blue-600/20 via-indigo-900/40 to-slate-900/50 relative overflow-hidden flex flex-col justify-center min-h-[240px] border-blue-500/20 shadow-2xl shadow-blue-900/20">
+                <div className="lg:col-span-2 glass-card p-8 bg-gradient-to-br from-blue-600/20 via-indigo-900/40 to-slate-900/50 relative overflow-hidden flex flex-col justify-center min-h-[200px] border-blue-500/20 shadow-2xl shadow-blue-900/20">
                     <div className="relative z-10">
                         <p className="text-blue-400 font-black uppercase tracking-[0.2em] text-[10px] mb-3">
-                            Ganancia Neta — {periodLabel}
+                            Ganancia Neta · {periodLabel}
                         </p>
-                        <h2 className={`text-7xl font-extrabold tracking-tighter mb-4 ${stats.net >= 0 ? 'text-white' : 'text-rose-400'}`}>
+                        <h2 className={`text-6xl font-extrabold tracking-tighter mb-4 ${stats.net >= 0 ? 'text-white' : 'text-rose-400'}`}>
                             ${stats.net.toLocaleString('es-AR')}
                         </h2>
-                        <div className="flex items-center gap-4">
+                        <div className="flex flex-wrap items-center gap-3">
                             <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-                                <Icon name={stats.net >= 0 ? 'trending-up' : 'trending-down'} size={14} className={stats.net >= 0 ? 'text-emerald-400' : 'text-rose-400'} />
+                                <Icon name={stats.net >= 0 ? 'trending-up' : 'trending-down'} size={13} className={stats.net >= 0 ? 'text-emerald-400' : 'text-rose-400'} />
                                 <span className={`text-[10px] font-bold uppercase ${stats.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                    {stats.net >= 0 ? 'Positivo' : 'Negativo'}
+                                    Margen {stats.margin}%
                                 </span>
                             </div>
                             <p className="text-slate-400 text-xs font-semibold">
-                                Basado en <span className="text-white">{stats.count}</span> {stats.count === 1 ? 'servicio' : 'servicios'} {periodLabel}
+                                <span className="text-white">{stats.count}</span> {stats.count === 1 ? 'servicio' : 'servicios'}
+                                {stats.topService && <span className="text-slate-500"> · Top: <span className="text-blue-400">{stats.topService}</span></span>}
                             </p>
                         </div>
                     </div>
                     <Icon name="bar-chart-3" size={180} className="absolute -right-10 -bottom-10 opacity-5 text-blue-400 transform -rotate-12" />
                 </div>
 
-                {/* Mini Stats */}
                 <div className="grid grid-cols-1 gap-4">
-                    <div className="glass-card p-6 flex flex-col justify-between border-emerald-500/10">
+                    <div className="glass-card p-5 flex flex-col justify-between border-emerald-500/10">
                         <div className="flex justify-between items-start">
-                            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl">
-                                <Icon name="arrow-up-right" size={20} />
+                            <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl">
+                                <Icon name="arrow-up-right" size={18} />
                             </div>
                             <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded">INGRESOS</span>
                         </div>
-                        <div className="mt-4">
-                            <p className="text-3xl font-black text-white">${stats.income.toLocaleString('es-AR')}</p>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">{stats.count} servicios {periodLabel}</p>
+                        <div className="mt-3">
+                            <p className="text-2xl font-black text-white">${stats.income.toLocaleString('es-AR')}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
+                                Ticket prom: ${stats.avgTicket.toLocaleString('es-AR')}
+                            </p>
                         </div>
                     </div>
 
-                    <div className="glass-card p-6 flex flex-col justify-between border-rose-500/10">
+                    <div className="glass-card p-5 flex flex-col justify-between border-rose-500/10">
                         <div className="flex justify-between items-start">
-                            <div className="p-3 bg-rose-500/10 text-rose-400 rounded-2xl">
-                                <Icon name="arrow-down-left" size={20} />
+                            <div className="p-2.5 bg-rose-500/10 text-rose-400 rounded-xl">
+                                <Icon name="arrow-down-left" size={18} />
                             </div>
                             <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-2 py-1 rounded">GASTOS</span>
                         </div>
-                        <div className="mt-4">
-                            <p className="text-3xl font-black text-white">${stats.spend.toLocaleString('es-AR')}</p>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">Insumos y fijos {periodLabel}</p>
+                        <div className="mt-3">
+                            <p className="text-2xl font-black text-white">${stats.spend.toLocaleString('es-AR')}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
+                                {stats.expenseCount} {stats.expenseCount === 1 ? 'egreso' : 'egresos'}
+                            </p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Sección Inferior */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* ── INFERIOR ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="glass-card p-6">
-                    <div className="flex justify-between items-center mb-6">
+                    <div className="flex justify-between items-center mb-5">
                         <h4 className="font-bold text-slate-200 flex items-center gap-2 italic">
-                            <Icon name="history" size={18} className="text-blue-500" />
-                            Últimos Cortes — {periodLabel}
+                            <Icon name="scissors" size={16} className="text-blue-500" />
+                            Cortes · {periodLabel}
                         </h4>
+                        <span className="text-[10px] font-black text-slate-600 bg-white/5 px-2 py-1 rounded-lg uppercase">{stats.count} total</span>
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                         {stats.recentServices.length > 0 ? stats.recentServices.map(s => (
-                            <div key={s.id} className="flex justify-between items-center p-4 bg-white/[0.02] hover:bg-white/[0.05] rounded-2xl border border-white/[0.03] transition-all">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-xs">
+                            <div key={s.id} className="flex justify-between items-center p-3 bg-white/[0.02] hover:bg-white/[0.05] rounded-2xl border border-white/[0.03] transition-all">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-xs">
                                         {s.client ? s.client.charAt(0).toUpperCase() : '?'}
                                     </div>
                                     <div>
@@ -152,80 +272,76 @@ window.DashboardModule = ({ services, expenses }) => {
                                         <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">{s.service}</p>
                                     </div>
                                 </div>
-                                <p className="font-black text-emerald-400">+${Number(s.price).toLocaleString('es-AR')}</p>
+                                <p className="font-black text-emerald-400 text-sm">+${Number(s.price).toLocaleString('es-AR')}</p>
                             </div>
                         )) : (
                             <div className="text-center py-10 flex flex-col items-center gap-3">
-                                <Icon name="scissors" size={32} className="text-slate-800" />
-                                <p className="text-slate-600 text-xs font-bold uppercase italic">Sin actividad {periodLabel}</p>
+                                <Icon name="scissors" size={28} className="text-slate-800" />
+                                <p className="text-slate-600 text-xs font-bold uppercase italic">Sin servicios en este período</p>
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* Resumen visual del período */}
-                <div className="glass-card p-8 flex flex-col justify-between border-white/5">
-                    <h4 className="font-bold text-slate-200 flex items-center gap-2 italic mb-6">
-                        <Icon name="pie-chart" size={18} className="text-blue-500" />
-                        Resumen del período
+                <div className="glass-card p-6 flex flex-col border-white/5">
+                    <h4 className="font-bold text-slate-200 flex items-center gap-2 italic mb-5">
+                        <Icon name="pie-chart" size={16} className="text-blue-500" />
+                        Resumen financiero
                     </h4>
 
                     {stats.income > 0 || stats.spend > 0 ? (
-                        <div className="space-y-5 flex-1 flex flex-col justify-center">
-                            {/* Barra de ingresos */}
+                        <div className="space-y-4 flex-1 flex flex-col justify-center">
                             <div>
-                                <div className="flex justify-between text-[10px] font-black uppercase mb-2">
+                                <div className="flex justify-between text-[10px] font-black uppercase mb-1.5">
                                     <span className="text-emerald-400">Ingresos</span>
                                     <span className="text-white">${stats.income.toLocaleString('es-AR')}</span>
                                 </div>
-                                <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
-                                    <div className="h-full bg-emerald-500 rounded-full transition-all duration-700"
-                                        style={{ width: '100%' }}
-                                    />
+                                <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '100%' }} />
                                 </div>
                             </div>
-
-                            {/* Barra de gastos relativa a ingresos */}
                             <div>
-                                <div className="flex justify-between text-[10px] font-black uppercase mb-2">
+                                <div className="flex justify-between text-[10px] font-black uppercase mb-1.5">
                                     <span className="text-rose-400">Gastos</span>
                                     <span className="text-white">${stats.spend.toLocaleString('es-AR')}</span>
                                 </div>
-                                <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
+                                <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden">
                                     <div className="h-full bg-rose-500 rounded-full transition-all duration-700"
-                                        style={{ width: `${Math.min((stats.spend / (stats.income || 1)) * 100, 100)}%` }}
-                                    />
+                                        style={{ width: `${Math.min((stats.spend / (stats.income || 1)) * 100, 100)}%` }} />
                                 </div>
                             </div>
-
-                            {/* Barra de ganancia neta */}
                             <div>
-                                <div className="flex justify-between text-[10px] font-black uppercase mb-2">
+                                <div className="flex justify-between text-[10px] font-black uppercase mb-1.5">
                                     <span className="text-blue-400">Ganancia neta</span>
                                     <span className={stats.net >= 0 ? 'text-blue-400' : 'text-rose-400'}>
                                         ${stats.net.toLocaleString('es-AR')}
                                     </span>
                                 </div>
-                                <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
+                                <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden">
                                     <div className={`h-full rounded-full transition-all duration-700 ${stats.net >= 0 ? 'bg-blue-500' : 'bg-rose-600'}`}
-                                        style={{ width: `${Math.min(Math.abs(stats.net / (stats.income || 1)) * 100, 100)}%` }}
-                                    />
+                                        style={{ width: `${Math.min(Math.abs((stats.net / (stats.income || 1)) * 100), 100)}%` }} />
                                 </div>
                             </div>
 
-                            <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
-                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Margen</p>
-                                <p className={`text-lg font-black italic ${stats.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                    {stats.income > 0 ? `${Math.round((stats.net / stats.income) * 100)}%` : '—'}
-                                </p>
+                            <div className="mt-2 pt-4 border-t border-white/5 grid grid-cols-3 gap-2 text-center">
+                                <div>
+                                    <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest mb-1">Servicios</p>
+                                    <p className="text-xl font-black text-white">{stats.count}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest mb-1">Ticket prom.</p>
+                                    <p className="text-xl font-black text-amber-400">${stats.avgTicket.toLocaleString('es-AR')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest mb-1">Margen</p>
+                                    <p className={`text-xl font-black italic ${stats.margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{stats.margin}%</p>
+                                </div>
                             </div>
                         </div>
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center gap-3">
-                            <Icon name="bar-chart-2" size={40} className="text-slate-800" />
-                            <p className="text-slate-600 text-xs font-bold uppercase italic text-center">
-                                Sin datos para {periodLabel}
-                            </p>
+                            <Icon name="bar-chart-2" size={36} className="text-slate-800" />
+                            <p className="text-slate-600 text-xs font-bold uppercase italic text-center">Sin datos para este período</p>
                         </div>
                     )}
                 </div>
