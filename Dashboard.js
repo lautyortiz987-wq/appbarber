@@ -1,9 +1,9 @@
 /**
  * DashboardModule - Resúmenes con navegación Mes > Semana > Día
+ * v4 - Sin loops infinitos, comparaciones de fecha seguras
  */
 window.DashboardModule = ({ services, expenses }) => {
     const Icon = window.LucideIcon;
-
     const now = new Date();
 
     const [viewMode, setViewMode] = React.useState('day');
@@ -12,67 +12,76 @@ window.DashboardModule = ({ services, expenses }) => {
     const [selectedDay, setSelectedDay] = React.useState(now.getDate());
     const [selectedWeek, setSelectedWeek] = React.useState(0);
 
-    const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-    // Semanas del mes seleccionado
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+
+    // Calcular semanas SIN loops potencialmente infinitos
     const weeksInMonth = React.useMemo(() => {
         const weeks = [];
-        const firstDay = new Date(selectedYear, selectedMonth, 1);
-        const lastDay = new Date(selectedYear, selectedMonth + 1, 0);
-        let cursor = new Date(firstDay);
-        let weekNum = 1;
-
-        while (cursor <= lastDay) {
-            const start = new Date(cursor);
-            const end = new Date(cursor);
-            // Fin de semana = domingo o fin de mes
-            const daysUntilSunday = 7 - (cursor.getDay() || 7);
-            end.setDate(end.getDate() + daysUntilSunday);
-            if (end > lastDay) end.setTime(lastDay.getTime());
-
-            weeks.push({
-                num: weekNum++,
-                start: new Date(start),
-                end: new Date(end),
-                label: `${start.getDate()}/${start.getMonth()+1} — ${end.getDate()}/${end.getMonth()+1}`
-            });
-
-            cursor.setDate(end.getDate() + 1);
+        const totalDays = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+        let day = 1;
+        while (day <= totalDays) {
+            const startDay = day;
+            // Semana termina el domingo: calcular qué día de semana es startDay
+            const startDate = new Date(selectedYear, selectedMonth, startDay);
+            const dow = startDate.getDay(); // 0=dom, 1=lun...6=sab
+            // Días hasta el próximo domingo (fin de semana)
+            const daysUntilSunday = dow === 0 ? 0 : 7 - dow;
+            const endDay = Math.min(startDay + daysUntilSunday, totalDays);
+            weeks.push({ startDay, endDay });
+            day = endDay + 1;
         }
         return weeks;
     }, [selectedMonth, selectedYear]);
 
-    // Reset semana y día al cambiar mes
-    React.useEffect(() => {
-        setSelectedWeek(0);
+    const prevMonth = () => {
+        if (selectedMonth === 0) {
+            setSelectedMonth(11);
+            setSelectedYear(y => y - 1);
+        } else {
+            setSelectedMonth(m => m - 1);
+        }
         setSelectedDay(1);
-    }, [selectedMonth, selectedYear]);
+        setSelectedWeek(0);
+    };
 
-    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+    const nextMonth = () => {
+        if (selectedMonth === 11) {
+            setSelectedMonth(0);
+            setSelectedYear(y => y + 1);
+        } else {
+            setSelectedMonth(m => m + 1);
+        }
+        setSelectedDay(1);
+        setSelectedWeek(0);
+    };
 
-    // Stats filtradas
+    // Filtrado seguro — todo por números, sin new Date() en el loop
     const stats = React.useMemo(() => {
-        const inRange = (dateStr) => {
-            if (!dateStr) return false;
+        const parseDate = (dateStr) => {
+            if (!dateStr) return null;
             const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return null;
+            return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() };
+        };
+
+        const inRange = (dateStr) => {
+            const p = parseDate(dateStr);
+            if (!p) return false;
 
             if (viewMode === 'month') {
-                return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+                return p.m === selectedMonth && p.y === selectedYear;
             }
             if (viewMode === 'week') {
                 const week = weeksInMonth[selectedWeek];
                 if (!week) return false;
-                const start = new Date(week.start); start.setHours(0,0,0,0);
-                const end = new Date(week.end); end.setHours(23,59,59,999);
-                return d >= start && d <= end;
+                return p.m === selectedMonth && p.y === selectedYear &&
+                       p.d >= week.startDay && p.d <= week.endDay;
             }
             if (viewMode === 'day') {
-                const target = new Date(selectedYear, selectedMonth, selectedDay);
-                return (
-                    d.getFullYear() === target.getFullYear() &&
-                    d.getMonth() === target.getMonth() &&
-                    d.getDate() === target.getDate()
-                );
+                return p.d === selectedDay && p.m === selectedMonth && p.y === selectedYear;
             }
             return false;
         };
@@ -81,11 +90,13 @@ window.DashboardModule = ({ services, expenses }) => {
         const filteredE = expenses.filter(e => inRange(e.date));
 
         const income = filteredS.reduce((acc, s) => acc + Number(s.price || 0), 0);
-        const spend = filteredE.reduce((acc, e) => acc + Number(e.amount || 0), 0);
+        const spend  = filteredE.reduce((acc, e) => acc + Number(e.amount || 0), 0);
 
         const serviceCount = {};
-        filteredS.forEach(s => { serviceCount[s.service] = (serviceCount[s.service] || 0) + 1; });
-        const topService = Object.entries(serviceCount).sort((a,b) => b[1]-a[1])[0];
+        filteredS.forEach(s => {
+            if (s.service) serviceCount[s.service] = (serviceCount[s.service] || 0) + 1;
+        });
+        const topEntry = Object.entries(serviceCount).sort((a, b) => b[1] - a[1])[0];
 
         return {
             income, spend,
@@ -94,24 +105,15 @@ window.DashboardModule = ({ services, expenses }) => {
             expenseCount: filteredE.length,
             avgTicket: filteredS.length > 0 ? Math.round(income / filteredS.length) : 0,
             recentServices: [...filteredS].reverse().slice(0, 5),
-            topService: topService ? topService[0] : null,
+            topService: topEntry ? topEntry[0] : null,
             margin: income > 0 ? Math.round(((income - spend) / income) * 100) : 0
         };
     }, [services, expenses, viewMode, selectedMonth, selectedYear, selectedDay, selectedWeek, weeksInMonth]);
 
     const periodLabel =
-        viewMode === 'day' ? `${selectedDay} de ${MONTHS[selectedMonth]} ${selectedYear}` :
-        viewMode === 'week' && weeksInMonth[selectedWeek] ? `Semana ${selectedWeek + 1} · ${MONTHS[selectedMonth]} ${selectedYear}` :
-        `${MONTHS[selectedMonth]} ${selectedYear}`;
-
-    const prevMonth = () => {
-        if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(y => y - 1); }
-        else setSelectedMonth(m => m - 1);
-    };
-    const nextMonth = () => {
-        if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(y => y + 1); }
-        else setSelectedMonth(m => m + 1);
-    };
+        viewMode === 'day'   ? `${selectedDay} de ${MONTHS[selectedMonth]} ${selectedYear}` :
+        viewMode === 'week'  ? `Sem ${selectedWeek + 1} · ${MONTHS[selectedMonth]} ${selectedYear}` :
+                               `${MONTHS[selectedMonth]} ${selectedYear}`;
 
     return (
         <div className="space-y-6 fade-in">
@@ -119,72 +121,65 @@ window.DashboardModule = ({ services, expenses }) => {
             {/* ── SELECTOR ── */}
             <div className="glass-card p-5 border-white/5 space-y-4">
 
-                {/* Fila 1: Mes + modos */}
+                {/* Fila 1: Mes + tabs */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
-                        <button onClick={prevMonth} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all">
+                        <button onClick={prevMonth}
+                            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all">
                             <Icon name="chevron-left" size={16} />
                         </button>
-                        <div className="px-4 py-2 bg-blue-600/20 border border-blue-500/20 rounded-xl min-w-[160px] text-center">
+                        <div className="px-4 py-2 bg-blue-600/20 border border-blue-500/20 rounded-xl min-w-[170px] text-center">
                             <span className="text-sm font-black text-blue-300 uppercase tracking-wide">
                                 {MONTHS[selectedMonth]} {selectedYear}
                             </span>
                         </div>
-                        <button onClick={nextMonth} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all">
+                        <button onClick={nextMonth}
+                            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all">
                             <Icon name="chevron-right" size={16} />
                         </button>
                     </div>
 
                     <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
-                        {[['day','Día'],['week','Semana'],['month','Mes']].map(([val, lbl]) => (
-                            <button
-                                key={val}
-                                onClick={() => setViewMode(val)}
+                        {[['day','Día'], ['week','Semana'], ['month','Mes']].map(([val, lbl]) => (
+                            <button key={val} onClick={() => setViewMode(val)}
                                 className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
                                     viewMode === val
                                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
                                         : 'text-slate-500 hover:text-slate-300'
-                                }`}
-                            >
+                                }`}>
                                 {lbl}
                             </button>
                         ))}
                     </div>
                 </div>
 
-                {/* Fila 2: Días del mes */}
+                {/* Días */}
                 {viewMode === 'day' && (
                     <div className="flex gap-1.5 flex-wrap">
                         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
-                            <button
-                                key={d}
-                                onClick={() => setSelectedDay(d)}
+                            <button key={d} onClick={() => setSelectedDay(d)}
                                 className={`w-8 h-8 rounded-lg text-[11px] font-black transition-all ${
                                     selectedDay === d
                                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
                                         : 'bg-white/5 text-slate-500 hover:bg-white/10 hover:text-white'
-                                }`}
-                            >
+                                }`}>
                                 {d}
                             </button>
                         ))}
                     </div>
                 )}
 
-                {/* Fila 2: Semanas del mes */}
+                {/* Semanas */}
                 {viewMode === 'week' && (
                     <div className="flex gap-2 flex-wrap">
                         {weeksInMonth.map((w, i) => (
-                            <button
-                                key={i}
-                                onClick={() => setSelectedWeek(i)}
+                            <button key={i} onClick={() => setSelectedWeek(i)}
                                 className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${
                                     selectedWeek === i
                                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
                                         : 'bg-white/5 text-slate-500 hover:bg-white/10 hover:text-white border border-white/5'
-                                }`}
-                            >
-                                Sem {i + 1} · {w.label}
+                                }`}>
+                                Sem {i + 1} · {w.startDay}/{selectedMonth+1} — {w.endDay}/{selectedMonth+1}
                             </button>
                         ))}
                     </div>
@@ -203,14 +198,17 @@ window.DashboardModule = ({ services, expenses }) => {
                         </h2>
                         <div className="flex flex-wrap items-center gap-3">
                             <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-                                <Icon name={stats.net >= 0 ? 'trending-up' : 'trending-down'} size={13} className={stats.net >= 0 ? 'text-emerald-400' : 'text-rose-400'} />
+                                <Icon name={stats.net >= 0 ? 'trending-up' : 'trending-down'} size={13}
+                                    className={stats.net >= 0 ? 'text-emerald-400' : 'text-rose-400'} />
                                 <span className={`text-[10px] font-bold uppercase ${stats.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                     Margen {stats.margin}%
                                 </span>
                             </div>
                             <p className="text-slate-400 text-xs font-semibold">
                                 <span className="text-white">{stats.count}</span> {stats.count === 1 ? 'servicio' : 'servicios'}
-                                {stats.topService && <span className="text-slate-500"> · Top: <span className="text-blue-400">{stats.topService}</span></span>}
+                                {stats.topService && (
+                                    <span className="text-slate-500"> · Top: <span className="text-blue-400">{stats.topService}</span></span>
+                                )}
                             </p>
                         </div>
                     </div>
@@ -258,7 +256,9 @@ window.DashboardModule = ({ services, expenses }) => {
                             <Icon name="scissors" size={16} className="text-blue-500" />
                             Cortes · {periodLabel}
                         </h4>
-                        <span className="text-[10px] font-black text-slate-600 bg-white/5 px-2 py-1 rounded-lg uppercase">{stats.count} total</span>
+                        <span className="text-[10px] font-black text-slate-600 bg-white/5 px-2 py-1 rounded-lg uppercase">
+                            {stats.count} total
+                        </span>
                     </div>
                     <div className="space-y-3">
                         {stats.recentServices.length > 0 ? stats.recentServices.map(s => (
@@ -306,7 +306,7 @@ window.DashboardModule = ({ services, expenses }) => {
                                     <span className="text-white">${stats.spend.toLocaleString('es-AR')}</span>
                                 </div>
                                 <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden">
-                                    <div className="h-full bg-rose-500 rounded-full transition-all duration-700"
+                                    <div className="h-full bg-rose-500 rounded-full transition-all duration-500"
                                         style={{ width: `${Math.min((stats.spend / (stats.income || 1)) * 100, 100)}%` }} />
                                 </div>
                             </div>
@@ -318,7 +318,7 @@ window.DashboardModule = ({ services, expenses }) => {
                                     </span>
                                 </div>
                                 <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all duration-700 ${stats.net >= 0 ? 'bg-blue-500' : 'bg-rose-600'}`}
+                                    <div className={`h-full rounded-full transition-all duration-500 ${stats.net >= 0 ? 'bg-blue-500' : 'bg-rose-600'}`}
                                         style={{ width: `${Math.min(Math.abs((stats.net / (stats.income || 1)) * 100), 100)}%` }} />
                                 </div>
                             </div>
@@ -334,7 +334,9 @@ window.DashboardModule = ({ services, expenses }) => {
                                 </div>
                                 <div>
                                     <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest mb-1">Margen</p>
-                                    <p className={`text-xl font-black italic ${stats.margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{stats.margin}%</p>
+                                    <p className={`text-xl font-black italic ${stats.margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                        {stats.margin}%
+                                    </p>
                                 </div>
                             </div>
                         </div>
