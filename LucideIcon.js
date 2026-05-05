@@ -6,11 +6,9 @@ window.LucideIcon = ({ name, size = 16, className = '' }) => {
 
     const iconData = window.lucide && window.lucide[pascal];
 
-    if (!iconData) {
-        return React.createElement('span', {
-            style: { display: 'inline-block', width: size, height: size }
-        });
-    }
+    if (!iconData) return React.createElement('span', {
+        style: { display: 'inline-block', width: size, height: size }
+    });
 
     const [, , children] = iconData;
 
@@ -18,20 +16,16 @@ window.LucideIcon = ({ name, size = 16, className = '' }) => {
         React.createElement(tag, { key: i, ...childAttrs })
     );
 
-    return React.createElement(
-        'svg',
-        {
-            xmlns: 'http://www.w3.org/2000/svg',
-            width: size,
-            height: size,
-            viewBox: '0 0 24 24',
-            fill: 'none',
-            stroke: 'currentColor',
-            strokeWidth: 2,
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round',
-            className: className
-        },
-        ...svgChildren
-    );
+    return React.createElement('svg', {
+        xmlns: 'http://www.w3.org/2000/svg',
+        width: size,
+        height: size,
+        viewBox: '0 0 24 24',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 2,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+        className: className
+    }, ...svgChildren);
 };
