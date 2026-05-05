@@ -10,8 +10,26 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <script>
+        // Adaptador: convierte <Icon name="chevron-left" size={16} /> al componente React correcto
+        window.LucideIcon = ({ name, size = 16, className = '' }) => {
+            const icons = window.LucideReact || {};
+            // Convierte "chevron-left" → "ChevronLeft"
+            const pascal = name
+                .split('-')
+                .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                .join('');
+            const Comp = icons[pascal];
+            if (!Comp) {
+                console.warn('[LucideIcon] Ícono no encontrado:', name, '→', pascal);
+                return null;
+            }
+            return React.createElement(Comp, { size, className });
+        };
+    </script>
 
     <style>
         :root {
