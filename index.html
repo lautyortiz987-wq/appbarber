@@ -5,35 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barber Pro Manager | Modular Dashboard</title>
     
-    <!-- Frameworks & Fonts -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide-react@0.383.0/dist/umd/lucide-react.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
-
-    <script>
-        window.LucideIcon = ({ name, size = 16, className = '' }) => {
-            const lib = window.LucideReact || window.lucideReact || window['lucide-react'] || {};
-
-            const pascal = name
-                .split('-')
-                .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-                .join('');
-
-            const Comp = lib[pascal];
-
-            if (!Comp) {
-                console.warn('[LucideIcon] No encontrado:', name, '→', pascal, '| Keys disponibles:', Object.keys(lib).slice(0, 5));
-                return React.createElement('span', {
-                    style: { display: 'inline-block', width: size, height: size }
-                });
-            }
-
-            return React.createElement(Comp, { size, className });
-        };
-    </script>
 
     <style>
         :root {
@@ -64,7 +41,6 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
         input, select {
             background: rgba(15, 23, 42, 0.8) !important;
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -75,14 +51,12 @@
 <body>
     <div id="root"></div>
 
-    <!-- Módulos de la Aplicación -->
+    <script type="text/babel" src="LucideIcon.js"></script>
     <script type="text/babel" src="Dashboard.js"></script>
     <script type="text/babel" src="Historial.js"></script>
     <script type="text/babel" src="Gastos.js"></script>
     <script type="text/babel" src="Clientes.js"></script>
     <script type="text/babel" src="Turnos.js"></script>
-    
-    <!-- App Principal (Carga al final) -->
     <script type="text/babel" src="App.js"></script>
 </body>
 </html>
