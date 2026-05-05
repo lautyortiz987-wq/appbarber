@@ -1,6 +1,6 @@
 /**
  * DashboardModule - Resúmenes con navegación Mes > Semana > Día
- * v4 - Sin loops infinitos, comparaciones de fecha seguras
+ * v5 - Fix timezone offset + fix month view + fix week calc
  */
 window.DashboardModule = ({ services, expenses }) => {
     const Icon = window.LucideIcon;
@@ -17,71 +17,80 @@ window.DashboardModule = ({ services, expenses }) => {
 
     const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
 
-    // Calcular semanas SIN loops potencialmente infinitos
+    // Semanas del mes — sin Date objects, puro aritmética
     const weeksInMonth = React.useMemo(() => {
+        const total = new Date(selectedYear, selectedMonth + 1, 0).getDate();
         const weeks = [];
-        const totalDays = new Date(selectedYear, selectedMonth + 1, 0).getDate();
         let day = 1;
-        while (day <= totalDays) {
-            const startDay = day;
-            // Semana termina el domingo: calcular qué día de semana es startDay
-            const startDate = new Date(selectedYear, selectedMonth, startDay);
-            const dow = startDate.getDay(); // 0=dom, 1=lun...6=sab
-            // Días hasta el próximo domingo (fin de semana)
-            const daysUntilSunday = dow === 0 ? 0 : 7 - dow;
-            const endDay = Math.min(startDay + daysUntilSunday, totalDays);
-            weeks.push({ startDay, endDay });
-            day = endDay + 1;
+        while (day <= total && weeks.length < 6) {
+            const start = day;
+            // Buscar el próximo domingo
+            const startDate = new Date(selectedYear, selectedMonth, day);
+            const dow = startDate.getDay(); // 0=dom
+            const remaining = dow === 0 ? 0 : 7 - dow;
+            const end = Math.min(day + remaining, total);
+            weeks.push({ startDay: start, endDay: end });
+            day = end + 1;
         }
         return weeks;
     }, [selectedMonth, selectedYear]);
 
     const prevMonth = () => {
-        if (selectedMonth === 0) {
-            setSelectedMonth(11);
-            setSelectedYear(y => y - 1);
-        } else {
-            setSelectedMonth(m => m - 1);
-        }
+        const nm = selectedMonth === 0 ? 11 : selectedMonth - 1;
+        const ny = selectedMonth === 0 ? selectedYear - 1 : selectedYear;
+        setSelectedMonth(nm);
+        setSelectedYear(ny);
         setSelectedDay(1);
         setSelectedWeek(0);
     };
 
     const nextMonth = () => {
-        if (selectedMonth === 11) {
-            setSelectedMonth(0);
-            setSelectedYear(y => y + 1);
-        } else {
-            setSelectedMonth(m => m + 1);
-        }
+        const nm = selectedMonth === 11 ? 0 : selectedMonth + 1;
+        const ny = selectedMonth === 11 ? selectedYear + 1 : selectedYear;
+        setSelectedMonth(nm);
+        setSelectedYear(ny);
         setSelectedDay(1);
         setSelectedWeek(0);
     };
 
-    // Filtrado seguro — todo por números, sin new Date() en el loop
-    const stats = React.useMemo(() => {
-        const parseDate = (dateStr) => {
-            if (!dateStr) return null;
+    // Parsear fecha ISO compensando timezone local
+    // "2026-05-04T01:04:02.368Z" en UTC-3 = 4 de mayo local
+    const parseLocalDate = (dateStr) => {
+        if (!dateStr) return null;
+        try {
             const d = new Date(dateStr);
             if (isNaN(d.getTime())) return null;
-            return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() };
-        };
+            // Usar métodos locales del browser (ya compensan timezone)
+            return {
+                y: d.getFullYear(),
+                m: d.getMonth(),   // 0-indexed
+                d: d.getDate()
+            };
+        } catch(e) {
+            return null;
+        }
+    };
 
+    const stats = React.useMemo(() => {
         const inRange = (dateStr) => {
-            const p = parseDate(dateStr);
+            const p = parseLocalDate(dateStr);
             if (!p) return false;
 
             if (viewMode === 'month') {
-                return p.m === selectedMonth && p.y === selectedYear;
+                return p.y === selectedYear && p.m === selectedMonth;
             }
             if (viewMode === 'week') {
                 const week = weeksInMonth[selectedWeek];
                 if (!week) return false;
-                return p.m === selectedMonth && p.y === selectedYear &&
-                       p.d >= week.startDay && p.d <= week.endDay;
+                return p.y === selectedYear &&
+                       p.m === selectedMonth &&
+                       p.d >= week.startDay &&
+                       p.d <= week.endDay;
             }
             if (viewMode === 'day') {
-                return p.d === selectedDay && p.m === selectedMonth && p.y === selectedYear;
+                return p.y === selectedYear &&
+                       p.m === selectedMonth &&
+                       p.d === selectedDay;
             }
             return false;
         };
@@ -89,14 +98,14 @@ window.DashboardModule = ({ services, expenses }) => {
         const filteredS = services.filter(s => inRange(s.date));
         const filteredE = expenses.filter(e => inRange(e.date));
 
-        const income = filteredS.reduce((acc, s) => acc + Number(s.price || 0), 0);
-        const spend  = filteredE.reduce((acc, e) => acc + Number(e.amount || 0), 0);
+        const income = filteredS.reduce((a, s) => a + Number(s.price  || 0), 0);
+        const spend  = filteredE.reduce((a, e) => a + Number(e.amount || 0), 0);
 
-        const serviceCount = {};
+        const svcCount = {};
         filteredS.forEach(s => {
-            if (s.service) serviceCount[s.service] = (serviceCount[s.service] || 0) + 1;
+            if (s.service) svcCount[s.service] = (svcCount[s.service] || 0) + 1;
         });
-        const topEntry = Object.entries(serviceCount).sort((a, b) => b[1] - a[1])[0];
+        const topEntry = Object.entries(svcCount).sort((a,b) => b[1]-a[1])[0];
 
         return {
             income, spend,
@@ -111,9 +120,11 @@ window.DashboardModule = ({ services, expenses }) => {
     }, [services, expenses, viewMode, selectedMonth, selectedYear, selectedDay, selectedWeek, weeksInMonth]);
 
     const periodLabel =
-        viewMode === 'day'   ? `${selectedDay} de ${MONTHS[selectedMonth]} ${selectedYear}` :
-        viewMode === 'week'  ? `Sem ${selectedWeek + 1} · ${MONTHS[selectedMonth]} ${selectedYear}` :
-                               `${MONTHS[selectedMonth]} ${selectedYear}`;
+        viewMode === 'day'
+            ? `${selectedDay} de ${MONTHS[selectedMonth]} ${selectedYear}`
+        : viewMode === 'week' && weeksInMonth[selectedWeek]
+            ? `Sem ${selectedWeek + 1} · ${MONTHS[selectedMonth]} ${selectedYear}`
+        : `${MONTHS[selectedMonth]} ${selectedYear}`;
 
     return (
         <div className="space-y-6 fade-in">
@@ -121,8 +132,8 @@ window.DashboardModule = ({ services, expenses }) => {
             {/* ── SELECTOR ── */}
             <div className="glass-card p-5 border-white/5 space-y-4">
 
-                {/* Fila 1: Mes + tabs */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
+                    {/* Nav mes */}
                     <div className="flex items-center gap-2">
                         <button onClick={prevMonth}
                             className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all">
@@ -139,9 +150,11 @@ window.DashboardModule = ({ services, expenses }) => {
                         </button>
                     </div>
 
+                    {/* Tabs */}
                     <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
                         {[['day','Día'], ['week','Semana'], ['month','Mes']].map(([val, lbl]) => (
-                            <button key={val} onClick={() => setViewMode(val)}
+                            <button key={val}
+                                onClick={() => setViewMode(val)}
                                 className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
                                     viewMode === val
                                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
@@ -153,11 +166,12 @@ window.DashboardModule = ({ services, expenses }) => {
                     </div>
                 </div>
 
-                {/* Días */}
+                {/* Sub-selector días */}
                 {viewMode === 'day' && (
                     <div className="flex gap-1.5 flex-wrap">
                         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
-                            <button key={d} onClick={() => setSelectedDay(d)}
+                            <button key={d}
+                                onClick={() => setSelectedDay(d)}
                                 className={`w-8 h-8 rounded-lg text-[11px] font-black transition-all ${
                                     selectedDay === d
                                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
@@ -169,11 +183,12 @@ window.DashboardModule = ({ services, expenses }) => {
                     </div>
                 )}
 
-                {/* Semanas */}
+                {/* Sub-selector semanas */}
                 {viewMode === 'week' && (
                     <div className="flex gap-2 flex-wrap">
                         {weeksInMonth.map((w, i) => (
-                            <button key={i} onClick={() => setSelectedWeek(i)}
+                            <button key={i}
+                                onClick={() => setSelectedWeek(i)}
                                 className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${
                                     selectedWeek === i
                                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
@@ -186,7 +201,7 @@ window.DashboardModule = ({ services, expenses }) => {
                 )}
             </div>
 
-            {/* ── BALANCE PRINCIPAL ── */}
+            {/* ── BALANCE ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 glass-card p-8 bg-gradient-to-br from-blue-600/20 via-indigo-900/40 to-slate-900/50 relative overflow-hidden flex flex-col justify-center min-h-[200px] border-blue-500/20 shadow-2xl shadow-blue-900/20">
                     <div className="relative z-10">
@@ -306,7 +321,7 @@ window.DashboardModule = ({ services, expenses }) => {
                                     <span className="text-white">${stats.spend.toLocaleString('es-AR')}</span>
                                 </div>
                                 <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden">
-                                    <div className="h-full bg-rose-500 rounded-full transition-all duration-500"
+                                    <div className="h-full bg-rose-500 rounded-full"
                                         style={{ width: `${Math.min((stats.spend / (stats.income || 1)) * 100, 100)}%` }} />
                                 </div>
                             </div>
@@ -318,7 +333,7 @@ window.DashboardModule = ({ services, expenses }) => {
                                     </span>
                                 </div>
                                 <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all duration-500 ${stats.net >= 0 ? 'bg-blue-500' : 'bg-rose-600'}`}
+                                    <div className={`h-full rounded-full ${stats.net >= 0 ? 'bg-blue-500' : 'bg-rose-600'}`}
                                         style={{ width: `${Math.min(Math.abs((stats.net / (stats.income || 1)) * 100), 100)}%` }} />
                                 </div>
                             </div>
