@@ -1,14 +1,6 @@
 {
   "historial": [
     {
-      "id": 1777955230727,
-      "client": "asdas",
-      "service": "Corte Clásico",
-      "price": 222222,
-      "date": "2026-05-05T04:27:10.727Z",
-      "isFromTurno": true
-    },
-    {
       "id": 1777930171374,
       "client": "Abuelo ricky",
       "service": "Corte Clásico",
@@ -78,13 +70,6 @@
       "phone": "",
       "visits": 1,
       "lastVisit": "2026-05-04T21:29:31.375Z"
-    },
-    {
-      "id": 1777955230728,
-      "name": "asdas",
-      "phone": "",
-      "visits": 1,
-      "lastVisit": "2026-05-05T04:27:10.727Z"
     }
   ],
   "turnos": [
@@ -96,7 +81,7 @@
       "service": "Corte Clásico",
       "price": 222222,
       "date": "2026-05-05",
-      "status": "completed"
+      "status": "pending"
     },
     {
       "id": "1777930166688",
