@@ -1,6 +1,6 @@
 /**
  * DashboardModule - Resúmenes con navegación Mes > Semana > Día
- * v5 - Fix timezone offset + fix month view + fix week calc
+ * v6 - Fix parseLocalDate para fechas solo "YYYY-MM-DD" + debug log
  */
 window.DashboardModule = ({ services, expenses }) => {
     const Icon = window.LucideIcon;
@@ -17,16 +17,14 @@ window.DashboardModule = ({ services, expenses }) => {
 
     const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
 
-    // Semanas del mes — sin Date objects, puro aritmética
     const weeksInMonth = React.useMemo(() => {
         const total = new Date(selectedYear, selectedMonth + 1, 0).getDate();
         const weeks = [];
         let day = 1;
         while (day <= total && weeks.length < 6) {
             const start = day;
-            // Buscar el próximo domingo
             const startDate = new Date(selectedYear, selectedMonth, day);
-            const dow = startDate.getDay(); // 0=dom
+            const dow = startDate.getDay();
             const remaining = dow === 0 ? 0 : 7 - dow;
             const end = Math.min(day + remaining, total);
             weeks.push({ startDay: start, endDay: end });
@@ -53,28 +51,34 @@ window.DashboardModule = ({ services, expenses }) => {
         setSelectedWeek(0);
     };
 
-const parseLocalDate = (dateStr) => {
-    if (!dateStr) return null;
-    try {
-        // Si viene solo como "YYYY-MM-DD", parsear manualmente para evitar offset UTC
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-            const [y, m, d] = dateStr.split('-').map(Number);
-            return { y, m: m - 1, d }; // m es 0-indexed
+    const parseLocalDate = (dateStr) => {
+        if (!dateStr) return null;
+        try {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                const [y, m, d] = dateStr.split('-').map(Number);
+                return { y, m: m - 1, d };
+            }
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return null;
+            return {
+                y: d.getFullYear(),
+                m: d.getMonth(),
+                d: d.getDate()
+            };
+        } catch(e) {
+            return null;
         }
-        // Si viene con hora (ISO completo), usar métodos locales
-        const d = new Date(dateStr);
-        if (isNaN(d.getTime())) return null;
-        return {
-            y: d.getFullYear(),
-            m: d.getMonth(),
-            d: d.getDate()
-        };
-    } catch(e) {
-        return null;
-    }
-};
+    };
 
     const stats = React.useMemo(() => {
+        // DEBUG - sacar después de confirmar que funciona
+        if (services.length > 0) {
+            console.log('[Dashboard] Ejemplo fecha servicio:', services[0].date, typeof services[0].date);
+        }
+        if (expenses.length > 0) {
+            console.log('[Dashboard] Ejemplo fecha gasto:', expenses[0].date, typeof expenses[0].date);
+        }
+
         const inRange = (dateStr) => {
             const p = parseLocalDate(dateStr);
             if (!p) return false;
@@ -136,7 +140,6 @@ const parseLocalDate = (dateStr) => {
             <div className="glass-card p-5 border-white/5 space-y-4">
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    {/* Nav mes */}
                     <div className="flex items-center gap-2">
                         <button onClick={prevMonth}
                             className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all">
@@ -153,7 +156,6 @@ const parseLocalDate = (dateStr) => {
                         </button>
                     </div>
 
-                    {/* Tabs */}
                     <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
                         {[['day','Día'], ['week','Semana'], ['month','Mes']].map(([val, lbl]) => (
                             <button key={val}
