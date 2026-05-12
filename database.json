@@ -1,6 +1,14 @@
 {
   "historial": [
     {
+      "id": 1778546825107,
+      "client": "Bauti",
+      "service": "Degradé / Fade",
+      "price": 6000,
+      "date": "2026-05-12T00:47:05.107Z",
+      "isFromTurno": true
+    },
+    {
       "id": 1777930171374,
       "client": "Abuelo ricky",
       "service": "Corte Clásico",
@@ -70,6 +78,13 @@
       "phone": "",
       "visits": 1,
       "lastVisit": "2026-05-04T21:29:31.375Z"
+    },
+    {
+      "id": 1778546825109,
+      "name": "Bauti",
+      "phone": "",
+      "visits": 1,
+      "lastVisit": "2026-05-12T00:47:05.108Z"
     }
   ],
   "turnos": [
@@ -81,7 +96,7 @@
       "service": "Degradé / Fade",
       "price": 6000,
       "date": "2026-05-12",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "1777955229284",
