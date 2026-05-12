@@ -74,6 +74,16 @@
   ],
   "turnos": [
     {
+      "id": "1778546821443",
+      "client": "Bauti",
+      "phone": "",
+      "time": "21:00",
+      "service": "Degradé / Fade",
+      "price": 6000,
+      "date": "2026-05-12",
+      "status": "pending"
+    },
+    {
       "id": "1777955229284",
       "client": "asdas",
       "phone": "",
